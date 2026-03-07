@@ -50,9 +50,10 @@ body,.logo,.url-row button,.play-btn,.download-btn,.modal-confirm,.progress-bar,
 
 /* ── Header ── */
 header{display:flex;align-items:center;justify-content:space-between;max-width:1400px;margin:0 auto 32px;padding:20px 40px;width:100%}
-.logo{font-size:1.2rem;font-weight:700;letter-spacing:-0.02em;
+.logo{font-size:1.2rem;font-weight:700;letter-spacing:-0.02em;display:flex;align-items:center;gap:10px;
   background:linear-gradient(90deg,hsl(var(--theme1-h),94%,76%),var(--accent2));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.logo-waveform{flex-shrink:0}
 .header-right{display:flex;align-items:center;gap:12px}
 .gear-btn{background:none;border:none;cursor:pointer;color:var(--muted);padding:6px;border-radius:8px;transition:color .2s,background .2s;line-height:0}
 .gear-btn:hover{color:var(--text);background:var(--card)}
