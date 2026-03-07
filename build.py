@@ -741,6 +741,16 @@ function currentPosition() {
   return Math.min(elapsed, state.duration);
 }
 
+function displayDuration() {
+  if (!state.duration || !state.speed) return 0;
+  return state.duration / state.speed;
+}
+
+function displayPosition() {
+  if (!state.speed) return 0;
+  return currentPosition() / state.speed;
+}
+
 function seekTo(fraction) {
   const offset = fraction * state.duration;
   state.pausedAt = offset;
@@ -837,8 +847,8 @@ function startAnimLoop() {
 }
 
 function updateTimeDisplay() {
-  const pos = currentPosition();
-  document.getElementById('timeDisplay').textContent = `${fmt(pos)} / ${fmt(state.duration)}`;
+  const pos = displayPosition();
+  document.getElementById('timeDisplay').textContent = `${fmt(pos)} / ${fmt(displayDuration())}`;
 }
 
 // ─── Load Audio ──────────────────────────────────────────────────────────────
@@ -940,6 +950,7 @@ document.getElementById('speedSlider').addEventListener('input', e => {
   state.speed = e.target.value / 100;
   document.getElementById('speedVal').textContent = state.speed.toFixed(2) + '×';
   if (state.source) state.source.playbackRate.value = state.speed;
+  updateTimeDisplay();
 });
 
 document.getElementById('reverbSlider').addEventListener('input', e => {
