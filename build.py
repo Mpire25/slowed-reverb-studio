@@ -305,7 +305,7 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
     <div class="slider-group">
       <div class="slider-row">
         <span class="slider-label">Speed</span>
-        <input type="range" id="speedSlider" min="50" max="100" value="75" step="1" aria-label="Speed">
+        <input type="range" id="speedSlider" min="50" max="150" value="75" step="1" aria-label="Speed">
         <span class="slider-value" id="speedVal">0.75×</span>
       </div>
       <div class="slider-row">
@@ -336,7 +336,7 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
   </div>
   <div class="setting-group">
     <label>Default Speed (×)</label>
-    <input type="number" id="defaultSpeed" value="0.75" min="0.5" max="1.0" step="0.05">
+    <input type="number" id="defaultSpeed" value="0.75" min="0.5" max="1.5" step="0.05">
   </div>
   <div class="setting-group">
     <label>Default Reverb Mix (%)</label>
@@ -412,6 +412,24 @@ const settings = {
 };
 
 const SETTINGS_STORAGE_KEY = 'slowedReverbStudio.settings.v1';
+const MIN_SPEED = 0.5;
+const MAX_SPEED = 1.5;
+
+function clampSpeed(speed) {
+  return Math.min(MAX_SPEED, Math.max(MIN_SPEED, speed));
+}
+
+function getExportSuffix(speed = state.speed) {
+  const base = settings.suffix || '';
+  if (speed > 1) {
+    return base
+      .replace(/slowed and reverb/ig, 'Sped Up and Reverb')
+      .replace(/slowed/ig, 'Sped Up');
+  }
+  return base
+    .replace(/sped up and reverb/ig, 'Slowed and Reverb')
+    .replace(/sped up/ig, 'Slowed');
+}
 
 function loadSettings() {
   try {
@@ -420,7 +438,7 @@ function loadSettings() {
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return;
     if (typeof parsed.suffix === 'string') settings.suffix = parsed.suffix;
-    if (Number.isFinite(parsed.defaultSpeed)) settings.defaultSpeed = parsed.defaultSpeed;
+    if (Number.isFinite(parsed.defaultSpeed)) settings.defaultSpeed = clampSpeed(parsed.defaultSpeed);
     if (Number.isFinite(parsed.defaultReverb)) settings.defaultReverb = parsed.defaultReverb;
     if (Number.isFinite(parsed.defaultDecay)) settings.defaultDecay = parsed.defaultDecay;
     if (typeof parsed.loopEnabled === 'boolean') settings.loopEnabled = parsed.loopEnabled;
@@ -443,6 +461,7 @@ function syncSettingsUI() {
   document.getElementById('defaultReverb').value = settings.defaultReverb;
   document.getElementById('defaultDecay').value = settings.defaultDecay;
 
+  settings.defaultSpeed = clampSpeed(settings.defaultSpeed);
   state.speed = settings.defaultSpeed;
   state.reverbMix = settings.defaultReverb / 100;
   state.reverbDecay = settings.defaultDecay;
@@ -1078,7 +1097,7 @@ document.getElementById('urlLoadBtn').addEventListener('click', async () => {
 document.getElementById('downloadBtn').addEventListener('click', () => {
   if (!state.audioBuffer) return;
   const title = document.getElementById('trackTitle').textContent.trim() || state.title;
-  const suffix = settings.suffix;
+  const suffix = getExportSuffix();
   const artist = state.artist;
   const suggested = sanitize(`${artist} - ${title}${suffix}`) + '.mp3';
   document.getElementById('filenameInput').value = suggested;
@@ -1183,7 +1202,7 @@ async function doExport(filename) {
     const artBytes = state.artBytes
       ? (state.artBytes instanceof Uint8Array ? new Uint8Array(state.artBytes) : new Uint8Array(state.artBytes))
       : null;
-    const id3Tag = buildID3Tag(title + settings.suffix, state.artist, artBytes, state.artMime);
+    const id3Tag = buildID3Tag(title + getExportSuffix(speed), state.artist, artBytes, state.artMime);
 
     // Assemble: ID3 + MP3 bytes
     const mp3Len = mp3Parts.reduce((n, p) => n + p.length, 0);
@@ -1237,7 +1256,8 @@ document.getElementById('suffixSetting').addEventListener('input', e => {
   saveSettings();
 });
 document.getElementById('defaultSpeed').addEventListener('change', e => {
-  settings.defaultSpeed = +e.target.value;
+  settings.defaultSpeed = clampSpeed(+e.target.value);
+  e.target.value = settings.defaultSpeed;
   saveSettings();
   if (!state.audioBuffer) {
     state.speed = settings.defaultSpeed;

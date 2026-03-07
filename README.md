@@ -8,11 +8,11 @@ Open `index.html` in your browser (double-click, or serve via the Flask server).
 
 1. Drag an MP3 onto the drop zone (or click to browse), **or** paste a YouTube/Spotify URL into the import field
 2. Adjust the sliders:
-   - **Speed** — 0.50× to 1.00× (default 0.75×). Lowers pitch as it slows, which is the aesthetic.
+   - **Speed** — 0.50× to 1.50× (default 0.75×). Lower values create slowed vocals; higher values create sped-up vocals.
    - **Reverb Mix** — dry/wet blend (default 40%)
    - **Reverb Decay** — tail length in seconds (default 3s)
 3. Hit play to preview
-4. Click **Download MP3** → confirm the filename → exports with correct ID3 tags (title, artist, album art) and a configurable suffix (default: ` (Slowed and Reverb)`)
+4. Click **Download MP3** → confirm the filename → exports with correct ID3 tags (title, artist, album art) and a configurable suffix (default: ` (Slowed and Reverb)`, auto-switches to `Sped Up` wording when speed > `1.0×`)
 
 Keyboard shortcut: `Space` to play/pause. Click the waveform to seek.
 
