@@ -109,17 +109,22 @@ export async function extractThemeFromArtwork(blobUrl) {
         const px = c.getImageData(0, 0, side, side).data;
         const bins = Array.from({ length: 36 }, () => ({ w: 0, h: 0, s: 0, l: 0 }));
 
+        let totalW = 0, totalSatW = 0, totalLumW = 0;
+
         for (let i = 0; i < px.length; i += 4) {
           const a = px[i + 3];
           if (a < 160) continue;
           const { h, s, l } = rgbToHsl(px[i], px[i + 1], px[i + 2]);
-          if (l < 0.08 || l > 0.92 || s < 0.12) continue;
+          if (l < 0.08 || l > 0.92 || s < 0.08) continue;
           const weight = s * (0.55 + 0.45 * (1 - Math.abs(l - 0.5) * 2));
           const bi = Math.floor(h / 10) % 36;
           bins[bi].w += weight;
           bins[bi].h += h * weight;
           bins[bi].s += s * weight;
           bins[bi].l += l * weight;
+          totalW += weight;
+          totalSatW += s * weight;
+          totalLumW += l * weight;
         }
 
         let first = -1;
@@ -127,7 +132,18 @@ export async function extractThemeFromArtwork(blobUrl) {
         for (let i = 0; i < bins.length; i++) {
           if (bins[i].w > firstW) { firstW = bins[i].w; first = i; }
         }
-        if (first < 0 || firstW < 0.4) { resolve(null); return; }
+        if (first < 0 || firstW < 0.2) { resolve(null); return; }
+
+        // Compute image mood to adaptively clamp output saturation/lightness.
+        // Muted/dark images shouldn't be forced into vivid mid-tone accents.
+        const avgSat = totalW > 0 ? totalSatW / totalW : 0.5;
+        const avgLum = totalW > 0 ? totalLumW / totalW : 0.5;
+        const mutedFactor = Math.min(1, avgSat / 0.35);  // 0 = very muted, 1 = vivid
+        const darkFactor  = Math.min(1, avgLum / 0.40);  // 0 = very dark,  1 = bright
+        const sMin = Math.round(35 + mutedFactor * 23);  // 35–58
+        const sMax = Math.round(75 + mutedFactor * 20);  // 75–95
+        const lMin = Math.round(22 + darkFactor  * 12);  // 22–34
+        const lMax = Math.round(52 + darkFactor  * 14);  // 52–66
 
         let second = -1;
         let secondW = 0;
@@ -138,17 +154,27 @@ export async function extractThemeFromArtwork(blobUrl) {
           if (hueDistance(firstHue, hue) < 36) continue;
           if (bins[i].w > secondW) { secondW = bins[i].w; second = i; }
         }
-        if (second < 0) second = (first + 12) % 36;
+        // Relax distance constraint for monochromatic/muted images
+        if (second < 0) {
+          secondW = 0;
+          for (let i = 0; i < bins.length; i++) {
+            if (i === first) continue;
+            if (hueDistance(firstHue, i * 10) < 20) continue;
+            if (bins[i].w > secondW) { secondW = bins[i].w; second = i; }
+          }
+        }
+        // Final fallback: analogous hue (+30°) rather than jumping +120°
+        if (second < 0) second = (first + 3) % 36;
 
         function toneFrom(idx, fallbackHue) {
           const b = bins[idx];
           if (!b || b.w < 0.2) {
-            return { h: fallbackHue, s: 78, l: 54 };
+            return { h: fallbackHue, s: (sMin + sMax) / 2, l: (lMin + lMax) / 2 };
           }
           return {
             h: ((b.h / b.w) % 360 + 360) % 360,
-            s: clampVal((b.s / b.w) * 100, 58, 95),
-            l: clampVal((b.l / b.w) * 100, 34, 66),
+            s: clampVal((b.s / b.w) * 100, sMin, sMax),
+            l: clampVal((b.l / b.w) * 100, lMin, lMax),
           };
         }
 
