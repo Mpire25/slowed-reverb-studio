@@ -1,0 +1,6 @@
+[submodule "downloaders/spotify-to-mp3"]
+	path = downloaders/spotify-to-mp3
+	url = https://github.com/Mpire25/spotify-to-mp3.git
+[submodule "downloaders/youtube-to-mp3"]
+	path = downloaders/youtube-to-mp3
+	url = https://github.com/Mpire25/youtube-to-mp3.git

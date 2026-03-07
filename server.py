@@ -16,7 +16,7 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-BASE = Path(__file__).parent.parent
+BASE = Path(__file__).parent / "downloaders"
 
 
 def extract_tags(mp3_path):
