@@ -1544,7 +1544,7 @@ function updateBottomVisualizerVisibility() {
 }
 
 const VISUALIZER_FADE_OUT_MS = 420;
-const VISUALIZER_CSS_HANDOFF_GAIN = 0.34;
+const VISUALIZER_FADE_CURVE = 1.45;
 
 function isBottomVisualizerFading() {
   return !state.playing &&
@@ -1574,7 +1574,7 @@ function beginBottomVisualizerFade() {
 
 function updateBottomVisualizerPlaybackState() {
   const canvas = document.getElementById('bottomVisualizer');
-  const active = state.visualizerEnabled && !!state.audioBuffer && (state.playing || isBottomVisualizerFading());
+  const active = state.visualizerEnabled && !!state.audioBuffer;
   canvas.classList.toggle('active', active);
 }
 
@@ -1681,8 +1681,7 @@ function drawBottomVisualizer(clearOnly = false) {
   } else if (fading && state.visualizerFadeBars) {
     const nowMs = performance.now();
     const fadeProgress = Math.min(1, Math.max(0, 1 - ((state.visualizerFadeOutUntil - nowMs) / VISUALIZER_FADE_OUT_MS)));
-    // Keep some residual energy for the CSS opacity fade handoff.
-    const fadeGain = VISUALIZER_CSS_HANDOFF_GAIN + (1 - VISUALIZER_CSS_HANDOFF_GAIN) * Math.pow(1 - fadeProgress, 1.45);
+    const fadeGain = Math.pow(1 - fadeProgress, VISUALIZER_FADE_CURVE);
     for (let i = 0; i < pointCount; i++) {
       const sourceIndex = Math.floor((i / pointCount) * state.visualizerFadeBars.length);
       const held = state.visualizerFadeBars[Math.min(state.visualizerFadeBars.length - 1, sourceIndex)] || 0;
