@@ -219,6 +219,29 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
 .progress-bar{height:3px;border-radius:3px;background:linear-gradient(90deg,var(--accent1),var(--accent2));width:0%;transition:width .3s}
 .progress-wrap{background:rgba(255,255,255,.08);border-radius:3px;margin-top:8px;overflow:hidden}
 
+/* ── Import status panel ── */
+.import-status{margin-top:12px;border-radius:var(--radius);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);overflow:hidden;animation:importFadeIn .2s ease}
+.import-meta{display:flex;gap:12px;align-items:center;padding:14px 14px 10px}
+.import-art{width:52px;height:52px;border-radius:8px;flex-shrink:0;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:1.5rem;overflow:hidden}
+.import-art img{width:100%;height:100%;object-fit:cover;border-radius:8px}
+.import-info{flex:1;min-width:0}
+.import-title{font-weight:700;font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.import-artist{font-size:.78rem;opacity:.55;margin-top:3px}
+.import-stage{padding:0 14px 8px;font-size:.78rem;opacity:.6}
+.import-track-progress{padding:0 14px 4px;font-size:.78rem;opacity:.55;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.import-bar-wrap{height:3px;background:rgba(255,255,255,.08);margin:0 14px 14px;border-radius:3px;overflow:hidden}
+.import-bar{height:3px;width:0%;background:linear-gradient(90deg,var(--accent1),var(--accent2));transition:width .25s;border-radius:3px}
+.import-tracks{max-height:130px;overflow-y:auto;border-top:1px solid rgba(255,255,255,.06)}
+.import-tracks::-webkit-scrollbar{width:3px}
+.import-tracks::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:3px}
+.import-track-item{padding:7px 14px;font-size:.78rem;display:flex;align-items:center;gap:8px;transition:background .15s}
+.import-track-item.done{opacity:.45}
+.import-track-item.active{background:rgba(124,58,237,.12)}
+.import-track-num{opacity:.35;font-size:.7rem;width:1.4em;flex-shrink:0}
+.import-track-check{color:#4ade80;flex-shrink:0}
+.import-track-err{color:#f87171;flex-shrink:0}
+@keyframes importFadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+
 /* ── Spinner ── */
 @keyframes spin{to{transform:rotate(360deg)}}
 .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}
@@ -256,6 +279,20 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
     <div class="url-row">
       <input type="text" id="urlInput" placeholder="Paste a YouTube or Spotify URL…" autocomplete="off">
       <button id="urlLoadBtn" disabled>Load</button>
+    </div>
+    <!-- Live import status -->
+    <div class="import-status" id="importStatus" style="display:none">
+      <div class="import-meta">
+        <div class="import-art" id="importArt">🎵</div>
+        <div class="import-info">
+          <div class="import-title" id="importTitle">Loading…</div>
+          <div class="import-artist" id="importArtist"></div>
+        </div>
+      </div>
+      <div class="import-stage" id="importStage"></div>
+      <div class="import-track-progress" id="importTrackProgress" style="display:none"></div>
+      <div class="import-bar-wrap"><div class="import-bar" id="importBar"></div></div>
+      <div class="import-tracks" id="importTrackList" style="display:none"></div>
     </div>
   </div>
 
@@ -1255,35 +1292,140 @@ async function checkServer() {
 
 checkServer();
 
-document.getElementById('urlLoadBtn').addEventListener('click', async () => {
+document.getElementById('urlLoadBtn').addEventListener('click', () => {
   const url = document.getElementById('urlInput').value.trim();
   if (!url) return;
-  const btn = document.getElementById('urlLoadBtn');
+
+  const btn        = document.getElementById('urlLoadBtn');
+  const statusEl   = document.getElementById('importStatus');
+  const artEl      = document.getElementById('importArt');
+  const titleEl    = document.getElementById('importTitle');
+  const artistEl   = document.getElementById('importArtist');
+  const stageEl    = document.getElementById('importStage');
+  const barEl      = document.getElementById('importBar');
+  const trackProgEl= document.getElementById('importTrackProgress');
+  const trackListEl= document.getElementById('importTrackList');
+
+  // Reset UI
   btn.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Loading…';
-  try {
-    let endpoint = url.includes('spotify') ? '/api/spotify' : '/api/youtube';
-    const res = await fetch(`${SERVER}${endpoint}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url }),
-      signal: AbortSignal.timeout(300000),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed');
+  statusEl.style.display = 'block';
+  artEl.innerHTML = '🎵';
+  titleEl.textContent = 'Connecting…';
+  artistEl.textContent = '';
+  stageEl.textContent = '';
+  barEl.style.width = '0%';
+  trackProgEl.style.display = 'none';
+  trackListEl.style.display = 'none';
+  trackListEl.innerHTML = '';
 
-    // Fetch the MP3 file via the server
-    const fileRes = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(data.file)}`);
-    if (!fileRes.ok) throw new Error('Could not retrieve file');
-    const ab = await fileRes.arrayBuffer();
-    await loadFile(ab, data.title + '.mp3');
-    document.getElementById('urlInput').value = '';
-  } catch (err) {
-    toast('Error: ' + err.message, 5000);
-  } finally {
+  let completedFile = null;
+  let completedTitle = 'track';
+
+  const es = new EventSource(`${SERVER}/api/download/stream?url=${encodeURIComponent(url)}`);
+
+  es.addEventListener('stage', e => {
+    const d = JSON.parse(e.data);
+    stageEl.textContent = d.message;
+  });
+
+  es.addEventListener('metadata', e => {
+    const d = JSON.parse(e.data);
+    completedTitle = d.name || d.title || 'track';
+    titleEl.textContent = completedTitle;
+    const trackCount = d.total_tracks > 1 ? ` • ${d.total_tracks} tracks` : '';
+    artistEl.textContent = (d.artist || '') + trackCount;
+    if (d.image_url) {
+      artEl.innerHTML = `<img src="${d.image_url}" alt="album art">`;
+    }
+    if (d.total_tracks > 1) {
+      trackListEl.style.display = 'block';
+    }
+  });
+
+  es.addEventListener('found', e => {
+    const d = JSON.parse(e.data);
+    stageEl.textContent = d.fallback
+      ? 'No exact match — searching YouTube…'
+      : 'Found on YouTube Music';
+  });
+
+  es.addEventListener('progress', e => {
+    const d = JSON.parse(e.data);
+    barEl.style.width = d.percent + '%';
+  });
+
+  es.addEventListener('track_start', e => {
+    const d = JSON.parse(e.data);
+    trackProgEl.style.display = 'block';
+    trackProgEl.textContent = `[${d.index + 1}/${d.total}] ${d.artist} – ${d.title}`;
+    barEl.style.width = '0%';
+    const item = document.createElement('div');
+    item.className = 'import-track-item active';
+    item.id = `itrack-${d.index}`;
+    item.innerHTML = `<span class="import-track-num">${d.index + 1}</span>${d.artist} – ${d.title}`;
+    trackListEl.appendChild(item);
+    item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  });
+
+  es.addEventListener('track_complete', e => {
+    const d = JSON.parse(e.data);
+    completedFile = d.file;
+    const item = document.getElementById(`itrack-${d.index}`);
+    if (item) {
+      item.className = 'import-track-item done';
+      item.innerHTML = `<span class="import-track-check">✓</span>${d.artist} – ${d.title}`;
+    }
+  });
+
+  es.addEventListener('track_error', e => {
+    const d = JSON.parse(e.data);
+    const item = document.getElementById(`itrack-${d.index}`);
+    if (item) {
+      item.className = 'import-track-item done';
+      item.innerHTML = `<span class="import-track-err">✗</span>${d.title}`;
+    }
+  });
+
+  es.addEventListener('complete', async e => {
+    es.close();
+    const d = JSON.parse(e.data);
+    const file = d.file || completedFile;
+    stageEl.textContent = '✓ Done — loading into studio…';
+    barEl.style.width = '100%';
+    try {
+      const fileRes = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(file)}`);
+      if (!fileRes.ok) throw new Error('Could not retrieve file');
+      const ab = await fileRes.arrayBuffer();
+      await loadFile(ab, completedTitle + '.mp3');
+      document.getElementById('urlInput').value = '';
+      statusEl.style.display = 'none';
+    } catch (err) {
+      stageEl.textContent = '✗ ' + err.message;
+      toast('Error: ' + err.message, 5000);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Load';
+    }
+  });
+
+  es.addEventListener('error', e => {
+    es.close();
+    let msg = 'Download failed';
+    try { msg = JSON.parse(e.data).message; } catch {}
+    stageEl.textContent = '✗ ' + msg;
+    toast('Error: ' + msg, 5000);
     btn.disabled = false;
     btn.textContent = 'Load';
-  }
+  });
+
+  es.onerror = () => {
+    if (es.readyState === EventSource.CLOSED) return;
+    es.close();
+    stageEl.textContent = '✗ Connection lost';
+    btn.disabled = false;
+    btn.textContent = 'Load';
+  };
 });
 
 // ─── Download ────────────────────────────────────────────────────────────────
