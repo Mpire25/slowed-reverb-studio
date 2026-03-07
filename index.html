@@ -101,12 +101,26 @@ header{display:flex;align-items:center;justify-content:space-between;max-width:1
 .url-row button:active{transform:scale(.97)}
 .url-row button:disabled{opacity:.4;cursor:not-allowed}
 .new-song-btn{
-  margin-bottom:16px;padding:9px 14px;border-radius:10px;border:1px solid var(--border);
-  background:rgba(255,255,255,.06);color:var(--text);cursor:pointer;font-size:.84rem;font-weight:600;
-  transition:background .2s,border-color .2s;
+  position:fixed;right:22px;bottom:22px;z-index:120;
+  display:inline-flex;align-items:center;gap:8px;
+  padding:13px 20px 13px 14px;border-radius:999px;border:1px solid rgba(216,180,254,.46);
+  background:linear-gradient(135deg,rgba(168,85,247,.95),rgba(236,72,153,.92));
+  color:#fff;cursor:pointer;font-size:.92rem;font-weight:700;
+  letter-spacing:.01em;box-shadow:0 10px 30px rgba(124,58,237,.35);
+  transition:transform .12s,filter .2s,box-shadow .2s;
 }
-.new-song-btn:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.18)}
+.new-song-btn .plus{
+  width:26px;height:26px;border-radius:50%;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.22);font-size:1.15rem;line-height:1;
+}
+.new-song-btn:hover{filter:brightness(1.06);transform:translateY(-1px);box-shadow:0 14px 36px rgba(124,58,237,.45)}
+.new-song-btn:active{transform:translateY(0)}
 .new-song-btn.hidden{display:none}
+@media (max-width:640px){
+  .new-song-btn{right:14px;bottom:14px;padding:12px 16px 12px 12px;font-size:.88rem}
+  .new-song-btn .plus{width:24px;height:24px;font-size:1.05rem}
+}
 @keyframes pulse-dot{0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,.5)}70%{box-shadow:0 0 0 5px rgba(52,211,153,0)}}
 .server-status{display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--muted);white-space:nowrap}
 .status-dot{width:7px;height:7px;border-radius:50%;background:#ef4444;flex-shrink:0}
@@ -317,7 +331,6 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
       <div class="import-tracks" id="importTrackList" style="display:none"></div>
     </div>
   </div>
-
   <!-- Track card -->
   <div class="card track-card hidden" id="trackCard">
     <div class="album-art" id="albumArt">🎵</div>
@@ -370,6 +383,7 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
 
   <!-- Download -->
   <button class="download-btn hidden" id="downloadBtn">Download MP3</button>
+  <button class="new-song-btn hidden" id="newSongBtn" type="button"><span class="plus">+</span> New Song</button>
 </div>
 
 <!-- Settings panel -->
@@ -1152,6 +1166,7 @@ async function loadFile(arrayBuffer, filename) {
     // Update UI
     updateTrackUI();
     showPlayerUI(true);
+    updateSourceImportUI();
     toast('Track loaded');
   } catch (err) {
     toast('Failed to decode audio: ' + err.message);
@@ -1179,11 +1194,50 @@ function showPlayerUI(show) {
   els.forEach(id => {
     document.getElementById(id).classList.toggle('hidden', !show);
   });
+  document.getElementById('newSongBtn').classList.toggle('hidden', !show);
   if (show) drawWaveform();
 }
 
 function showLoading(on) {
   document.getElementById('downloadBtn').disabled = on;
+}
+
+function updateSourceImportUI() {
+  const hasTrack = !!state.audioBuffer;
+  document.getElementById('dropZone').style.display = hasTrack ? 'none' : 'block';
+  document.getElementById('urlRow').style.display = (!hasTrack && state.serverOnline) ? 'block' : 'none';
+}
+
+function resetStudio() {
+  if (state.source) {
+    try { state.source.stop(); } catch(e) {}
+    try { state.source.disconnect(); } catch(e) {}
+    state.source = null;
+  }
+  if (state.convolver) { try { state.convolver.disconnect(); } catch(e) {} state.convolver = null; }
+  if (state.dryGain) { try { state.dryGain.disconnect(); } catch(e) {} state.dryGain = null; }
+  if (state.wetGain) { try { state.wetGain.disconnect(); } catch(e) {} state.wetGain = null; }
+  if (state.analyser) { try { state.analyser.disconnect(); } catch(e) {} state.analyser = null; }
+  if (state.artBlob) { URL.revokeObjectURL(state.artBlob); state.artBlob = null; }
+
+  state.audioBuffer = null;
+  state.waveformData = null;
+  state.duration = 0;
+  state.pausedAt = 0;
+  state.playing = false;
+  state.title = 'Unknown Title';
+  state.artist = 'Unknown Artist';
+  state.artBytes = null;
+  state.artMime = 'image/jpeg';
+
+  const urlInput = document.getElementById('urlInput');
+  if (urlInput) urlInput.value = '';
+  const statusEl = document.getElementById('importStatus');
+  if (statusEl) statusEl.style.display = 'none';
+
+  showPlayerUI(false);
+  updatePlayBtn();
+  updateSourceImportUI();
 }
 
 // ─── Effect Sliders ──────────────────────────────────────────────────────────
@@ -1301,7 +1355,6 @@ async function checkServer() {
     const r = await fetch(`${SERVER}/ping`, { signal: AbortSignal.timeout(800) });
     if (r.ok) {
       state.serverOnline = true;
-      document.getElementById('urlRow').style.display = 'block';
       document.getElementById('urlLoadBtn').disabled = false;
       labelEl.textContent = 'Bridge connected';
       statusEl.className = 'server-status online';
@@ -1310,9 +1363,11 @@ async function checkServer() {
     labelEl.textContent = 'Bridge offline';
     statusEl.className = 'server-status';
   }
+  updateSourceImportUI();
 }
 
 checkServer();
+document.getElementById('newSongBtn').addEventListener('click', resetStudio);
 
 document.getElementById('urlLoadBtn').addEventListener('click', () => {
   const url = document.getElementById('urlInput').value.trim();
