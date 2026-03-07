@@ -109,6 +109,7 @@ def download_stream():
 @app.route("/api/file")
 def serve_file():
     path = request.args.get("path", "")
+    consume = request.args.get("consume", "").strip().lower() in {"1", "true", "yes"}
     if not path:
         return jsonify({"error": "No path provided"}), 400
     p = Path(path).resolve()
@@ -119,7 +120,30 @@ def serve_file():
         return jsonify({"error": "Access denied"}), 403
     if not p.exists() or p.suffix.lower() != ".mp3":
         return jsonify({"error": "File not found"}), 404
-    return send_file(str(p), mimetype="audio/mpeg")
+
+    if not consume:
+        return send_file(str(p), mimetype="audio/mpeg")
+
+    # Stream file manually so cleanup happens deterministically after transfer.
+    def generate_and_cleanup():
+        try:
+            with p.open("rb") as f:
+                while True:
+                    chunk = f.read(64 * 1024)
+                    if not chunk:
+                        break
+                    yield chunk
+        finally:
+            try:
+                p.unlink()
+            except FileNotFoundError:
+                pass
+
+    return Response(
+        stream_with_context(generate_and_cleanup()),
+        mimetype="audio/mpeg",
+        headers={"Cache-Control": "no-cache"},
+    )
 
 
 if __name__ == "__main__":

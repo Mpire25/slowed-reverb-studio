@@ -1435,7 +1435,7 @@ document.getElementById('urlLoadBtn').addEventListener('click', () => {
   es.addEventListener('track_start', e => {
     const d = JSON.parse(e.data);
     trackProgEl.style.display = 'block';
-    trackProgEl.textContent = `[${d.index + 1}/${d.total}] ${d.artist} – ${d.title}`;
+    trackProgEl.textContent = `${d.artist} – ${d.title}`;
     barEl.style.width = '0%';
     const item = document.createElement('div');
     item.className = 'import-track-item active';
@@ -1471,7 +1471,7 @@ document.getElementById('urlLoadBtn').addEventListener('click', () => {
     stageEl.textContent = '✓ Done — loading into studio…';
     barEl.style.width = '100%';
     try {
-      const fileRes = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(file)}`);
+      const fileRes = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(file)}&consume=1`);
       if (!fileRes.ok) throw new Error('Could not retrieve file');
       const ab = await fileRes.arrayBuffer();
       await loadFile(ab, completedTitle + '.mp3');

@@ -968,7 +968,7 @@ document.getElementById('urlLoadBtn').addEventListener('click', async () => {
     if (!res.ok) throw new Error(data.error || 'Failed');
 
     // Fetch the MP3 file via the server
-    const fileRes = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(data.file)}`);
+    const fileRes = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(data.file)}&consume=1`);
     if (!fileRes.ok) throw new Error('Could not retrieve file');
     const ab = await fileRes.arrayBuffer();
     await loadFile(ab, data.title + '.mp3');
