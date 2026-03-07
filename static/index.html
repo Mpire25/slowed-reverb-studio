@@ -9,7 +9,28 @@
 <body>
 
 <header>
-    <div class="logo">Slowed &amp; Reverb Studio</div>
+    <div class="logo">
+      <svg class="logo-waveform" viewBox="0 0 48 30" width="48" height="30" aria-hidden="true">
+        <defs>
+          <linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" style="stop-color:var(--accent1)"/>
+            <stop offset="100%" style="stop-color:var(--accent2)"/>
+          </linearGradient>
+        </defs>
+        <!-- Compressed left bars -->
+        <rect x="0"  y="11" width="2.5" height="8"  rx="1.2" fill="url(#logoGrad)"/>
+        <rect x="4"  y="7"  width="2.5" height="16" rx="1.2" fill="url(#logoGrad)"/>
+        <rect x="8"  y="12" width="2.5" height="6"  rx="1.2" fill="url(#logoGrad)"/>
+        <rect x="12" y="5"  width="2.5" height="20" rx="1.2" fill="url(#logoGrad)"/>
+        <rect x="16" y="10" width="2.5" height="10" rx="1.2" fill="url(#logoGrad)"/>
+        <!-- Stretched right bars -->
+        <rect x="21" y="8"  width="4"   height="14" rx="2"   fill="url(#logoGrad)"/>
+        <rect x="27" y="3"  width="5"   height="24" rx="2.5" fill="url(#logoGrad)"/>
+        <rect x="34" y="7"  width="5"   height="16" rx="2.5" fill="url(#logoGrad)"/>
+        <rect x="41" y="2"  width="5"   height="26" rx="2.5" fill="url(#logoGrad)" opacity="0.75"/>
+      </svg>
+      Slowed &amp; Reverb Studio
+    </div>
     <div class="header-right">
       <div class="server-status" id="serverStatus" style="display:none">
         <span class="status-dot"></span>
