@@ -1403,15 +1403,18 @@ function drawBottomVisualizer(clearOnly = false) {
   const high = getEnergy(0.22, 0.55);
   const pulse = Math.min(1, bass * 0.55 + lowMid * 0.3 + high * 0.15);
   const intensity = 0.35 + pulse * 0.45 + state.visualizerLoudness * 0.8;
-  const hueDrift = now * 0.46;
+  const speedNorm = (state.speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED);
+  const speedNormClamped = Math.min(1, Math.max(0, speedNorm));
+  const rotationRate = 0.32 + Math.pow(speedNormClamped, 0.78) * 0.26;
+  const hueDrift = now * rotationRate;
   const hueA = 262 + Math.sin(hueDrift) * 26;         // purple
   const hueB = 192 + Math.sin(hueDrift + 1.8) * 22;   // cyan
   const hueC = 322 + Math.sin(hueDrift + 3.1) * 18;   // magenta accent
-  const gradShift = (Math.sin(now * 0.11) * 0.5 + 0.5) * W * 0.34;
+  const gradShift = (Math.sin(now * 0.11) * 0.5 + 0.5) * W * 0.17;
 
   const haze = ctx2d.createLinearGradient(gradShift, H, W - gradShift, 0);
   haze.addColorStop(0, `hsla(${hueA.toFixed(1)},88%,57%,${(0.08 + pulse * 0.16) * intensity})`);
-  haze.addColorStop(0.45, `hsla(${hueC.toFixed(1)},86%,64%,${(0.06 + pulse * 0.1) * intensity})`);
+  haze.addColorStop(0.225, `hsla(${hueC.toFixed(1)},86%,64%,${(0.06 + pulse * 0.1) * intensity})`);
   haze.addColorStop(1, `hsla(${hueB.toFixed(1)},92%,56%,0)`);
   ctx2d.fillStyle = haze;
   ctx2d.fillRect(0, 0, W, H);
