@@ -10,8 +10,16 @@
   --bg:#0a0a0f;
   --card:rgba(255,255,255,0.04);
   --border:rgba(255,255,255,0.08);
-  --accent1:#7c3aed;
-  --accent2:#06b6d4;
+  --theme1-h:262;
+  --theme1-s:84%;
+  --theme1-l:58%;
+  --theme2-h:190;
+  --theme2-s:89%;
+  --theme2-l:43%;
+  --accent1:hsl(var(--theme1-h),var(--theme1-s),var(--theme1-l));
+  --accent2:hsl(var(--theme2-h),var(--theme2-s),var(--theme2-l));
+  --accent1-rgb:124,58,237;
+  --accent2-rgb:6,182,212;
   --text:#e2e8f0;
   --muted:#64748b;
   --radius:16px;
@@ -35,10 +43,13 @@ html{
 *::-webkit-scrollbar-thumb:hover{background:var(--scroll-thumb-hover)}
 *::-webkit-scrollbar-corner{background:transparent}
 body{
-  background:radial-gradient(ellipse 80% 25% at 50% 0%,rgba(124,58,237,0.09) 0%,transparent 100%),
-             radial-gradient(ellipse 80% 20% at 50% 100%,rgba(6,182,212,0.05) 0%,transparent 100%),
+  background:radial-gradient(ellipse 80% 25% at 50% 0%,rgba(var(--accent1-rgb),0.09) 0%,transparent 100%),
+             radial-gradient(ellipse 80% 20% at 50% 100%,rgba(var(--accent2-rgb),0.06) 0%,transparent 100%),
              var(--bg);
   min-height:100vh;
+}
+body,.logo,.url-row button,.play-btn,.download-btn,.modal-confirm,.progress-bar,.import-bar,.new-song-btn{
+  transition:background .85s ease,background-image .85s ease,border-color .85s ease,box-shadow .85s ease,color .85s ease;
 }
 
 /* ── Layout ── */
@@ -47,7 +58,7 @@ body{
 /* ── Header ── */
 header{display:flex;align-items:center;justify-content:space-between;max-width:1400px;margin:0 auto 32px;padding:20px 40px;width:100%}
 .logo{font-size:1.2rem;font-weight:700;letter-spacing:-0.02em;
-  background:linear-gradient(90deg,#a78bfa,var(--accent2));
+  background:linear-gradient(90deg,hsl(var(--theme1-h),94%,76%),var(--accent2));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .header-right{display:flex;align-items:center;gap:12px}
 .gear-btn{background:none;border:none;cursor:pointer;color:var(--muted);padding:6px;border-radius:8px;transition:color .2s,background .2s;line-height:0}
@@ -74,7 +85,7 @@ header{display:flex;align-items:center;justify-content:space-between;max-width:1
   position:relative;
   margin-bottom:20px;
 }
-.drop-zone.drag-over{border-color:var(--accent1);background:rgba(124,58,237,0.08)}
+.drop-zone.drag-over{border-color:var(--accent1);background:rgba(var(--accent1-rgb),0.08)}
 .drop-zone .icon{font-size:2.4rem;margin-bottom:10px;opacity:.5}
 .drop-zone p{color:var(--muted);font-size:.9rem}
 .drop-zone strong{color:var(--text)}
@@ -103,10 +114,10 @@ header{display:flex;align-items:center;justify-content:space-between;max-width:1
 .new-song-btn{
   position:fixed;right:22px;bottom:22px;z-index:120;
   display:inline-flex;align-items:center;gap:8px;
-  padding:13px 20px 13px 14px;border-radius:999px;border:1px solid rgba(216,180,254,.46);
-  background:linear-gradient(135deg,rgba(168,85,247,.95),rgba(236,72,153,.92));
+  padding:13px 20px 13px 14px;border-radius:999px;border:1px solid rgba(var(--accent1-rgb),.55);
+  background:linear-gradient(135deg,rgba(var(--accent1-rgb),.95),rgba(var(--accent2-rgb),.93));
   color:#fff;cursor:pointer;font-size:.92rem;font-weight:700;
-  letter-spacing:.01em;box-shadow:0 10px 30px rgba(124,58,237,.35);
+  letter-spacing:.01em;box-shadow:0 10px 30px rgba(var(--accent1-rgb),.35);
   transition:transform .12s,filter .2s,box-shadow .2s;
 }
 .new-song-btn .plus{
@@ -114,7 +125,7 @@ header{display:flex;align-items:center;justify-content:space-between;max-width:1
   display:inline-flex;align-items:center;justify-content:center;
   background:rgba(255,255,255,.22);font-size:1.15rem;line-height:1;
 }
-.new-song-btn:hover{filter:brightness(1.06);box-shadow:0 14px 36px rgba(124,58,237,.45)}
+.new-song-btn:hover{filter:brightness(1.06);box-shadow:0 14px 36px rgba(var(--accent1-rgb),.45)}
 .new-song-btn:active{transform:translateY(0)}
 .new-song-btn.hidden{display:none}
 @media (max-width:640px){
@@ -507,6 +518,12 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
       <input type="checkbox" id="bottomVisualizerToggle" checked>
     </label>
   </div>
+  <div class="setting-group">
+    <label class="setting-toggle">
+      <span>Album Art Theme</span>
+      <input type="checkbox" id="artThemeToggle">
+    </label>
+  </div>
 </div>
 
 <!-- Download modal -->
@@ -844,6 +861,11 @@ a.length>D&&(D=a.length,p=0|1.25*D+7200,r=new Int8Array(p));a=u.lame_encode_buff
 <script>
 'use strict';
 
+const DEFAULT_THEME = {
+  h1: 262, s1: 84, l1: 58,
+  h2: 190, s2: 89, l2: 43,
+};
+
 // ─── State ───────────────────────────────────────────────────────────────────
 const state = {
   audioCtx: null,
@@ -877,6 +899,10 @@ const state = {
   visualizerBarData: null,
   visualizerTimeData: null,
   visualizerLoudness: 0,
+  themeCurrent: { ...DEFAULT_THEME },
+  themeTarget: { ...DEFAULT_THEME },
+  themeAnimFrame: null,
+  themeRequestId: 0,
 };
 
 const settings = {
@@ -885,6 +911,7 @@ const settings = {
   defaultDecay: 3,
   loopEnabled: false,
   visualizerEnabled: true,
+  artThemeEnabled: false,
 };
 
 const SETTINGS_STORAGE_KEY = 'slowedReverbStudio.settings.v1';
@@ -915,6 +942,7 @@ function loadSettings() {
     if (Number.isFinite(parsed.defaultDecay)) settings.defaultDecay = parsed.defaultDecay;
     if (typeof parsed.loopEnabled === 'boolean') settings.loopEnabled = parsed.loopEnabled;
     if (typeof parsed.visualizerEnabled === 'boolean') settings.visualizerEnabled = parsed.visualizerEnabled;
+    if (typeof parsed.artThemeEnabled === 'boolean') settings.artThemeEnabled = parsed.artThemeEnabled;
   } catch (err) {
     console.warn('Failed to load settings from localStorage', err);
   }
@@ -928,11 +956,194 @@ function saveSettings() {
   }
 }
 
+function clampVal(v, min, max) {
+  return Math.max(min, Math.min(max, v));
+}
+
+function hueDistance(a, b) {
+  const diff = Math.abs(a - b) % 360;
+  return diff > 180 ? 360 - diff : diff;
+}
+
+function lerpHue(a, b, t) {
+  const delta = ((b - a + 540) % 360) - 180;
+  return (a + delta * t + 360) % 360;
+}
+
+function hslToRgb(h, sPct, lPct) {
+  const s = sPct / 100;
+  const l = lPct / 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const hp = (h % 360) / 60;
+  const x = c * (1 - Math.abs((hp % 2) - 1));
+  let r = 0, g = 0, b = 0;
+  if (hp >= 0 && hp < 1) [r, g, b] = [c, x, 0];
+  else if (hp < 2) [r, g, b] = [x, c, 0];
+  else if (hp < 3) [r, g, b] = [0, c, x];
+  else if (hp < 4) [r, g, b] = [0, x, c];
+  else if (hp < 5) [r, g, b] = [x, 0, c];
+  else [r, g, b] = [c, 0, x];
+  const m = l - c / 2;
+  return {
+    r: Math.round((r + m) * 255),
+    g: Math.round((g + m) * 255),
+    b: Math.round((b + m) * 255),
+  };
+}
+
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return { h: 0, s: 0, l };
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h;
+  switch (max) {
+    case r: h = ((g - b) / d + (g < b ? 6 : 0)); break;
+    case g: h = ((b - r) / d + 2); break;
+    default: h = ((r - g) / d + 4); break;
+  }
+  return { h: h * 60, s, l };
+}
+
+function setThemeCss(theme) {
+  const root = document.documentElement;
+  root.style.setProperty('--theme1-h', theme.h1.toFixed(2));
+  root.style.setProperty('--theme1-s', `${theme.s1.toFixed(2)}%`);
+  root.style.setProperty('--theme1-l', `${theme.l1.toFixed(2)}%`);
+  root.style.setProperty('--theme2-h', theme.h2.toFixed(2));
+  root.style.setProperty('--theme2-s', `${theme.s2.toFixed(2)}%`);
+  root.style.setProperty('--theme2-l', `${theme.l2.toFixed(2)}%`);
+  const c1 = hslToRgb(theme.h1, theme.s1, theme.l1);
+  const c2 = hslToRgb(theme.h2, theme.s2, theme.l2);
+  root.style.setProperty('--accent1-rgb', `${c1.r},${c1.g},${c1.b}`);
+  root.style.setProperty('--accent2-rgb', `${c2.r},${c2.g},${c2.b}`);
+}
+
+function animateThemeTo(nextTheme, duration = 850) {
+  const target = {
+    h1: ((nextTheme.h1 % 360) + 360) % 360,
+    s1: clampVal(nextTheme.s1, 35, 100),
+    l1: clampVal(nextTheme.l1, 20, 80),
+    h2: ((nextTheme.h2 % 360) + 360) % 360,
+    s2: clampVal(nextTheme.s2, 35, 100),
+    l2: clampVal(nextTheme.l2, 20, 80),
+  };
+  state.themeTarget = target;
+  if (state.themeAnimFrame) cancelAnimationFrame(state.themeAnimFrame);
+  const startTheme = { ...state.themeCurrent };
+  const start = performance.now();
+
+  function tick(now) {
+    const t = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);
+    const cur = {
+      h1: lerpHue(startTheme.h1, target.h1, eased),
+      s1: startTheme.s1 + (target.s1 - startTheme.s1) * eased,
+      l1: startTheme.l1 + (target.l1 - startTheme.l1) * eased,
+      h2: lerpHue(startTheme.h2, target.h2, eased),
+      s2: startTheme.s2 + (target.s2 - startTheme.s2) * eased,
+      l2: startTheme.l2 + (target.l2 - startTheme.l2) * eased,
+    };
+    state.themeCurrent = cur;
+    setThemeCss(cur);
+    if (t < 1) state.themeAnimFrame = requestAnimationFrame(tick);
+  }
+
+  state.themeAnimFrame = requestAnimationFrame(tick);
+}
+
+async function extractThemeFromArtwork(blobUrl) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const side = 64;
+        const canvas = document.createElement('canvas');
+        canvas.width = side;
+        canvas.height = side;
+        const c = canvas.getContext('2d', { willReadFrequently: true });
+        c.drawImage(img, 0, 0, side, side);
+        const px = c.getImageData(0, 0, side, side).data;
+        const bins = Array.from({ length: 36 }, () => ({ w: 0, h: 0, s: 0, l: 0 }));
+
+        for (let i = 0; i < px.length; i += 4) {
+          const a = px[i + 3];
+          if (a < 160) continue;
+          const { h, s, l } = rgbToHsl(px[i], px[i + 1], px[i + 2]);
+          if (l < 0.08 || l > 0.92 || s < 0.12) continue;
+          const weight = s * (0.55 + 0.45 * (1 - Math.abs(l - 0.5) * 2));
+          const bi = Math.floor(h / 10) % 36;
+          bins[bi].w += weight;
+          bins[bi].h += h * weight;
+          bins[bi].s += s * weight;
+          bins[bi].l += l * weight;
+        }
+
+        let first = -1;
+        let firstW = 0;
+        for (let i = 0; i < bins.length; i++) {
+          if (bins[i].w > firstW) { firstW = bins[i].w; first = i; }
+        }
+        if (first < 0 || firstW < 0.4) { resolve(null); return; }
+
+        let second = -1;
+        let secondW = 0;
+        const firstHue = first * 10;
+        for (let i = 0; i < bins.length; i++) {
+          if (i === first) continue;
+          const hue = i * 10;
+          if (hueDistance(firstHue, hue) < 36) continue;
+          if (bins[i].w > secondW) { secondW = bins[i].w; second = i; }
+        }
+        if (second < 0) second = (first + 12) % 36;
+
+        function toneFrom(idx, fallbackHue) {
+          const b = bins[idx];
+          if (!b || b.w < 0.2) {
+            return { h: fallbackHue, s: 78, l: 54 };
+          }
+          return {
+            h: ((b.h / b.w) % 360 + 360) % 360,
+            s: clampVal((b.s / b.w) * 100, 58, 95),
+            l: clampVal((b.l / b.w) * 100, 34, 66),
+          };
+        }
+
+        const aTone = toneFrom(first, first * 10);
+        const bTone = toneFrom(second, second * 10);
+        resolve({
+          h1: aTone.h, s1: aTone.s, l1: aTone.l,
+          h2: bTone.h, s2: bTone.s, l2: bTone.l,
+        });
+      } catch (err) {
+        console.warn('Album-art theme extraction failed', err);
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = blobUrl;
+  });
+}
+
+async function applyThemeFromCurrentTrack() {
+  const reqId = ++state.themeRequestId;
+  if (!settings.artThemeEnabled || !state.artBlob) {
+    animateThemeTo(DEFAULT_THEME);
+    return;
+  }
+  const extracted = await extractThemeFromArtwork(state.artBlob);
+  if (reqId !== state.themeRequestId) return;
+  animateThemeTo(extracted || DEFAULT_THEME);
+}
+
 function syncSettingsUI() {
   document.getElementById('defaultSpeed').value = settings.defaultSpeed;
   document.getElementById('defaultReverb').value = settings.defaultReverb;
   document.getElementById('defaultDecay').value = settings.defaultDecay;
   document.getElementById('bottomVisualizerToggle').checked = settings.visualizerEnabled;
+  document.getElementById('artThemeToggle').checked = settings.artThemeEnabled;
 
   settings.defaultSpeed = clampSpeed(settings.defaultSpeed);
   state.speed = settings.defaultSpeed;
@@ -940,6 +1151,7 @@ function syncSettingsUI() {
   state.reverbDecay = settings.defaultDecay;
   state.loopEnabled = settings.loopEnabled;
   state.visualizerEnabled = settings.visualizerEnabled;
+  setThemeCss(state.themeCurrent);
 
   document.getElementById('speedSlider').value = Math.round(state.speed * 100);
   document.getElementById('speedVal').textContent = state.speed.toFixed(2) + '×';
@@ -1306,7 +1518,7 @@ function drawWaveform() {
     const y = (H - h) / 2;
     const frac = x / W;
     if (frac < pos) {
-      ctx2d.fillStyle = '#7c3aed';
+      ctx2d.fillStyle = `hsl(${state.themeCurrent.h1.toFixed(1)}, ${state.themeCurrent.s1.toFixed(1)}%, ${state.themeCurrent.l1.toFixed(1)}%)`;
     } else {
       ctx2d.fillStyle = 'rgba(255,255,255,0.15)';
     }
@@ -1314,7 +1526,7 @@ function drawWaveform() {
   }
 
   // Playhead
-  ctx2d.fillStyle = '#06b6d4';
+  ctx2d.fillStyle = `hsl(${state.themeCurrent.h2.toFixed(1)}, ${state.themeCurrent.s2.toFixed(1)}%, ${state.themeCurrent.l2.toFixed(1)}%)`;
   ctx2d.fillRect(playX - 1, 0, 2, H);
 
   ctx2d.setTransform(1,0,0,1,0,0);
@@ -1407,9 +1619,12 @@ function drawBottomVisualizer(clearOnly = false) {
   const speedNormClamped = Math.min(1, Math.max(0, speedNorm));
   const rotationRate = 0.32 + Math.pow(speedNormClamped, 0.78) * 0.26;
   const hueDrift = now * rotationRate;
-  const hueA = 262 + Math.sin(hueDrift) * 26;         // purple
-  const hueB = 192 + Math.sin(hueDrift + 1.8) * 22;   // cyan
-  const hueC = 322 + Math.sin(hueDrift + 3.1) * 18;   // magenta accent
+  const baseHue1 = state.themeCurrent.h1;
+  const baseHue2 = state.themeCurrent.h2;
+  const blendHue = (baseHue1 + baseHue2) * 0.5;
+  const hueA = baseHue1 + Math.sin(hueDrift) * 18;
+  const hueB = baseHue2 + Math.sin(hueDrift + 1.8) * 16;
+  const hueC = blendHue + 32 + Math.sin(hueDrift + 3.1) * 12;
   const gradShift = (Math.sin(now * 0.11) * 0.5 + 0.5) * W * 0.17;
 
   const haze = ctx2d.createLinearGradient(gradShift, H, W - gradShift, 0);
@@ -1549,6 +1764,7 @@ async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceLinks = 
 
     // Update UI
     updateTrackUI();
+    void applyThemeFromCurrentTrack();
     showPlayerUI(true);
     updateSourceImportUI();
     toast('Track loaded');
@@ -1649,6 +1865,7 @@ function resetStudio() {
   updatePlayBtn();
   updateSourceImportUI();
   updateBottomVisualizerPlaybackState();
+  void applyThemeFromCurrentTrack();
 }
 
 // ─── Effect Sliders ──────────────────────────────────────────────────────────
@@ -2164,6 +2381,11 @@ document.getElementById('bottomVisualizerToggle').addEventListener('change', e =
   updateBottomVisualizerVisibility();
   updateBottomVisualizerPlaybackState();
   drawBottomVisualizer(!state.playing);
+});
+document.getElementById('artThemeToggle').addEventListener('change', e => {
+  settings.artThemeEnabled = e.target.checked;
+  saveSettings();
+  void applyThemeFromCurrentTrack();
 });
 
 // ─── Resize waveform on window resize ────────────────────────────────────────
