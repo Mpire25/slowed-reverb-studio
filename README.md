@@ -4,7 +4,7 @@ A browser-based audio editor for creating slowed + reverb versions of tracks. Im
 
 ## Usage
 
-Open `index.html` in your browser (double-click, or serve via the Flask server).
+Open `index.html` in your browser (double-click, or serve it with a simple static server).
 
 1. Drag an MP3 onto the drop zone (or click to browse), **or** paste a YouTube/Spotify URL into the import field
 2. Adjust the sliders:
@@ -17,6 +17,14 @@ Open `index.html` in your browser (double-click, or serve via the Flask server).
 Keyboard shortcut: `Space` to play/pause. Click the waveform to seek.
 
 The gear icon (top right) opens settings to change default slider values.
+
+If you want to serve `index.html` over HTTP locally:
+
+```bash
+python3 -m http.server 8080
+```
+
+Then open `http://localhost:8080`.
 
 ---
 
@@ -58,7 +66,7 @@ SPOTIFY_CLIENT_SECRET=your_client_secret
 python server.py
 ```
 
-Then open `index.html`. When the server is detected on `localhost:7337`, a URL import field appears below the drop zone. Paste any YouTube video URL or Spotify track/album/playlist URL — the studio streams live download progress directly in the UI.
+Then open `index.html` (or your local static server URL). When the backend is detected on `http://localhost:7337`, a URL import field appears below the drop zone. Paste any YouTube video URL or Spotify track/album/playlist URL — the studio streams live download progress directly in the UI.
 
 ---
 
@@ -67,7 +75,7 @@ Then open `index.html`. When the server is detected on `localhost:7337`, a URL i
 ```
 slowed-reverb-studio/
   index.html            — single-file frontend (Web Audio API, vanilla JS, lamejs encoder)
-  server.py             — Flask backend (port 7337), SSE streaming
+  server.py             — Flask backend API (port 7337), SSE streaming
   studio_downloader.py  — integrated download engine (YouTube + Spotify)
   requirements.txt
   downloads/            — imported MP3s saved here
