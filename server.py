@@ -40,7 +40,7 @@ def run_script(script_dir, url):
     python = str(venv_python) if venv_python.exists() else sys.executable
 
     result = subprocess.run(
-        [python, "main.py", url],
+        [python, "main.py", url, "--headless"],
         cwd=str(script_dir),
         capture_output=True,
         text=True,
