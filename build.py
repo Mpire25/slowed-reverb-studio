@@ -823,7 +823,7 @@ async function loadAudioBuffer(arrayBuffer) {
   return buf;
 }
 
-async function loadFile(arrayBuffer, filename) {
+async function loadFile(arrayBuffer, filename, { autoPlay = true } = {}) {
   showLoading(true);
   try {
     // Parse ID3 tags
@@ -857,6 +857,7 @@ async function loadFile(arrayBuffer, filename) {
     updateTrackUI();
     showPlayerUI(true);
     toast('Track loaded');
+    if (autoPlay) play();
   } catch (err) {
     toast('Failed to decode audio: ' + err.message);
     console.error(err);
