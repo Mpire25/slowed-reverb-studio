@@ -777,6 +777,51 @@ const settings = {
   defaultDecay: 3,
 };
 
+const SETTINGS_STORAGE_KEY = 'slowedReverbStudio.settings.v1';
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return;
+    if (typeof parsed.suffix === 'string') settings.suffix = parsed.suffix;
+    if (Number.isFinite(parsed.defaultSpeed)) settings.defaultSpeed = parsed.defaultSpeed;
+    if (Number.isFinite(parsed.defaultReverb)) settings.defaultReverb = parsed.defaultReverb;
+    if (Number.isFinite(parsed.defaultDecay)) settings.defaultDecay = parsed.defaultDecay;
+  } catch (err) {
+    console.warn('Failed to load settings from localStorage', err);
+  }
+}
+
+function saveSettings() {
+  try {
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  } catch (err) {
+    console.warn('Failed to save settings to localStorage', err);
+  }
+}
+
+function syncSettingsUI() {
+  document.getElementById('suffixSetting').value = settings.suffix;
+  document.getElementById('defaultSpeed').value = settings.defaultSpeed;
+  document.getElementById('defaultReverb').value = settings.defaultReverb;
+  document.getElementById('defaultDecay').value = settings.defaultDecay;
+
+  state.speed = settings.defaultSpeed;
+  state.reverbMix = settings.defaultReverb / 100;
+  state.reverbDecay = settings.defaultDecay;
+
+  document.getElementById('speedSlider').value = Math.round(state.speed * 100);
+  document.getElementById('speedVal').textContent = state.speed.toFixed(2) + '×';
+  document.getElementById('reverbSlider').value = Math.round(state.reverbMix * 100);
+  document.getElementById('reverbVal').textContent = Math.round(state.reverbMix * 100) + '%';
+  document.getElementById('decaySlider').value = Math.round(state.reverbDecay * 10);
+  document.getElementById('decayVal').textContent = state.reverbDecay.toFixed(1) + 's';
+}
+
+loadSettings();
+
 // ─── Utils ───────────────────────────────────────────────────────────────────
 function fmt(s) {
   s = Math.max(0, s | 0);
@@ -1661,9 +1706,15 @@ function closeSettings() {
 document.getElementById('closeSettings').addEventListener('click', closeSettings);
 document.getElementById('overlay').addEventListener('click', closeSettings);
 
-document.getElementById('suffixSetting').addEventListener('input', e => { settings.suffix = e.target.value; });
+syncSettingsUI();
+
+document.getElementById('suffixSetting').addEventListener('input', e => {
+  settings.suffix = e.target.value;
+  saveSettings();
+});
 document.getElementById('defaultSpeed').addEventListener('change', e => {
   settings.defaultSpeed = +e.target.value;
+  saveSettings();
   if (!state.audioBuffer) {
     state.speed = settings.defaultSpeed;
     const sl = document.getElementById('speedSlider');
@@ -1673,9 +1724,23 @@ document.getElementById('defaultSpeed').addEventListener('change', e => {
 });
 document.getElementById('defaultReverb').addEventListener('change', e => {
   settings.defaultReverb = +e.target.value;
+  saveSettings();
+  if (!state.audioBuffer) {
+    state.reverbMix = settings.defaultReverb / 100;
+    const sl = document.getElementById('reverbSlider');
+    sl.value = settings.defaultReverb;
+    document.getElementById('reverbVal').textContent = settings.defaultReverb + '%';
+  }
 });
 document.getElementById('defaultDecay').addEventListener('change', e => {
   settings.defaultDecay = +e.target.value;
+  saveSettings();
+  if (!state.audioBuffer) {
+    state.reverbDecay = settings.defaultDecay;
+    const sl = document.getElementById('decaySlider');
+    sl.value = Math.round(settings.defaultDecay * 10);
+    document.getElementById('decayVal').textContent = settings.defaultDecay.toFixed(1) + 's';
+  }
 });
 
 // ─── Resize waveform on window resize ────────────────────────────────────────
