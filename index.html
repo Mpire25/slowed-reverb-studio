@@ -32,6 +32,7 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 .logo{font-size:1.2rem;font-weight:700;letter-spacing:-0.02em;
   background:linear-gradient(90deg,#a78bfa,var(--accent2));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.header-right{display:flex;align-items:center;gap:12px}
 .gear-btn{background:none;border:none;cursor:pointer;color:var(--muted);padding:6px;border-radius:8px;transition:color .2s,background .2s;line-height:0}
 .gear-btn:hover{color:var(--text);background:var(--card)}
 .gear-btn svg{width:20px;height:20px}
@@ -78,8 +79,11 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 .url-row button:hover{opacity:.9}
 .url-row button:active{transform:scale(.97)}
 .url-row button:disabled{opacity:.4;cursor:not-allowed}
-.server-status{font-size:.75rem;color:var(--muted);margin-top:6px;text-align:center}
-.server-status.online{color:#34d399}
+@keyframes pulse-dot{0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,.5)}70%{box-shadow:0 0 0 5px rgba(52,211,153,0)}}
+.server-status{display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--muted);white-space:nowrap}
+.status-dot{width:7px;height:7px;border-radius:50%;background:#ef4444;flex-shrink:0}
+.server-status.online .status-dot{background:#34d399;animation:pulse-dot 2s ease-in-out infinite}
+.server-status.online{color:var(--text)}
 
 /* ── Track card ── */
 .track-card{padding:20px;display:flex;gap:18px;align-items:flex-start;margin-bottom:20px}
@@ -221,11 +225,17 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
 <div class="app">
   <header>
     <div class="logo">Slowed &amp; Reverb Studio</div>
-    <button class="gear-btn" id="gearBtn" title="Settings" aria-label="Settings">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-      </svg>
-    </button>
+    <div class="header-right">
+      <div class="server-status" id="serverStatus" style="display:none">
+        <span class="status-dot"></span>
+        <span id="statusLabel"></span>
+      </div>
+      <button class="gear-btn" id="gearBtn" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
   </header>
 
   <!-- Drop zone -->
@@ -238,7 +248,6 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
       <input type="text" id="urlInput" placeholder="Spotify or YouTube URL…" autocomplete="off">
       <button id="urlLoadBtn" disabled>Load</button>
     </div>
-    <div class="server-status" id="serverStatus" style="display:none"></div>
   </div>
 
   <!-- Track card -->
@@ -1217,23 +1226,21 @@ function handleFileObject(file) {
 const SERVER = 'http://localhost:7337';
 
 async function checkServer() {
+  const statusEl = document.getElementById('serverStatus');
+  const labelEl = document.getElementById('statusLabel');
+  statusEl.style.display = 'flex';
   try {
     const r = await fetch(`${SERVER}/ping`, { signal: AbortSignal.timeout(800) });
     if (r.ok) {
       state.serverOnline = true;
       document.getElementById('urlRow').style.display = 'flex';
       document.getElementById('urlLoadBtn').disabled = false;
-      const statusEl = document.getElementById('serverStatus');
-      statusEl.style.display = 'block';
-      statusEl.textContent = '● Bridge server connected';
+      labelEl.textContent = 'Bridge connected';
       statusEl.className = 'server-status online';
     }
   } catch (_) {
-    // Server not running — show instructions only
-    const statusEl = document.getElementById('serverStatus');
-    statusEl.style.display = 'block';
+    labelEl.textContent = 'Bridge offline';
     statusEl.className = 'server-status';
-    statusEl.textContent = 'Run server.py to enable Spotify/YouTube loading';
   }
 }
 
