@@ -45,16 +45,23 @@ export function drawWaveform() {
   const n = data.length;
   const barW = W / n;
 
+  const { h1, s1, l1 } = state.themeCurrent;
+  const playedGrad = ctx2d.createLinearGradient(0, 0, 0, H);
+  playedGrad.addColorStop(0,   `hsla(${h1.toFixed(1)}, ${s1.toFixed(1)}%, ${l1.toFixed(1)}%, 0.08)`);
+  playedGrad.addColorStop(0.5, `hsla(${h1.toFixed(1)}, ${s1.toFixed(1)}%, ${l1.toFixed(1)}%, 1)`);
+  playedGrad.addColorStop(1,   `hsla(${h1.toFixed(1)}, ${s1.toFixed(1)}%, ${l1.toFixed(1)}%, 0.08)`);
+
+  const unplayedGrad = ctx2d.createLinearGradient(0, 0, 0, H);
+  unplayedGrad.addColorStop(0,   'rgba(255,255,255,0.02)');
+  unplayedGrad.addColorStop(0.5, 'rgba(255,255,255,0.15)');
+  unplayedGrad.addColorStop(1,   'rgba(255,255,255,0.02)');
+
   for (let i = 0; i < n; i++) {
     const x = i * barW;
     const h = Math.max(2, data[i] * H * 0.9);
     const y = (H - h) / 2;
     const frac = x / W;
-    if (frac < pos) {
-      ctx2d.fillStyle = `hsl(${state.themeCurrent.h1.toFixed(1)}, ${state.themeCurrent.s1.toFixed(1)}%, ${state.themeCurrent.l1.toFixed(1)}%)`;
-    } else {
-      ctx2d.fillStyle = 'rgba(255,255,255,0.15)';
-    }
+    ctx2d.fillStyle = frac < pos ? playedGrad : unplayedGrad;
     ctx2d.fillRect(x, y, Math.max(1, barW - 0.5), h);
   }
 
