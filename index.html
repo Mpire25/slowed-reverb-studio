@@ -103,6 +103,7 @@ header{display:flex;align-items:center;justify-content:space-between;max-width:1
 }
 .url-row input::placeholder{color:var(--muted)}
 .url-row input:focus{border-color:var(--accent1)}
+.url-row input:disabled{opacity:.55;cursor:not-allowed}
 .url-row button{
   padding:9px 16px;border-radius:10px;border:none;cursor:pointer;font-size:.875rem;font-weight:600;
   background:linear-gradient(135deg,var(--accent1),var(--accent2));color:#fff;
@@ -389,18 +390,42 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
 .progress-wrap{background:rgba(255,255,255,.08);border-radius:3px;margin-top:8px;overflow:hidden}
 
 /* ── Import status panel ── */
-.import-status{margin-top:12px;border-radius:var(--radius);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);overflow:hidden;animation:importFadeIn .2s ease}
+.import-status{
+  margin-top:12px;border-radius:var(--radius);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+  overflow:hidden;animation:importFadeIn .2s ease;transform:scale(.985);transform-origin:top center;
+  transition:transform .34s cubic-bezier(.22,.61,.36,1),box-shadow .34s cubic-bezier(.22,.61,.36,1),border-color .34s ease,background .34s ease
+}
+.import-status.live{transform:scale(1)}
+.import-status.expanded{
+  transform:scale(1.016);
+  border-color:rgba(124,58,237,.35);
+  background:rgba(255,255,255,.06);
+  box-shadow:0 10px 26px rgba(10,10,20,.22)
+}
 .import-meta{display:flex;gap:12px;align-items:center;padding:14px 14px 10px}
 .import-art{width:52px;height:52px;border-radius:8px;flex-shrink:0;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:1.5rem;overflow:hidden}
 .import-art img{width:100%;height:100%;object-fit:cover;border-radius:8px}
 .import-info{flex:1;min-width:0}
 .import-title{font-weight:700;font-size:.92rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .import-artist{font-size:.78rem;opacity:.55;margin-top:3px}
-.import-stage{padding:0 14px 8px;font-size:.78rem;opacity:.6}
-.import-track-progress{padding:0 14px 4px;font-size:.78rem;opacity:.55;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.import-stage{
+  padding:0 14px 8px;font-size:.78rem;opacity:.6;min-height:1.2em;
+  transition:opacity .18s ease,transform .22s cubic-bezier(.22,.61,.36,1)
+}
+.import-stage.updating{opacity:.2;transform:translateY(-2px)}
+.import-track-progress{
+  font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  max-height:0;opacity:0;transform:translateY(-3px);padding:0 14px;
+  transition:max-height .26s cubic-bezier(.22,.61,.36,1),padding .26s cubic-bezier(.22,.61,.36,1),opacity .24s ease,transform .24s cubic-bezier(.22,.61,.36,1)
+}
+.import-track-progress.visible{max-height:24px;opacity:.55;transform:translateY(0);padding:0 14px 4px}
 .import-bar-wrap{height:3px;background:rgba(255,255,255,.08);margin:0 14px 14px;border-radius:3px;overflow:hidden}
 .import-bar{height:3px;width:0%;background:linear-gradient(90deg,var(--accent1),var(--accent2));transition:width .25s;border-radius:3px}
-.import-tracks{max-height:130px;overflow-y:auto;border-top:1px solid rgba(255,255,255,.06)}
+.import-tracks{
+  max-height:0;overflow-y:auto;border-top:1px solid rgba(255,255,255,0);opacity:0;
+  transition:max-height .3s cubic-bezier(.22,.61,.36,1),opacity .24s ease,border-top-color .28s ease
+}
+.import-tracks.visible{max-height:130px;opacity:1;border-top-color:rgba(255,255,255,.06)}
 .import-track-item{padding:7px 14px;font-size:.78rem;display:flex;align-items:center;gap:8px;transition:background .15s}
 .import-track-item.done{opacity:.45}
 .import-track-item.active{background:rgba(124,58,237,.12)}
@@ -2184,7 +2209,8 @@ checkServer();
 document.getElementById('newSongBtn').addEventListener('click', resetStudio);
 
 document.getElementById('urlLoadBtn').addEventListener('click', () => {
-  const url = document.getElementById('urlInput').value.trim();
+  const urlInput = document.getElementById('urlInput');
+  const url = urlInput.value.trim();
   if (!url) return;
 
   const btn        = document.getElementById('urlLoadBtn');
@@ -2196,19 +2222,43 @@ document.getElementById('urlLoadBtn').addEventListener('click', () => {
   const barEl      = document.getElementById('importBar');
   const trackProgEl= document.getElementById('importTrackProgress');
   const trackListEl= document.getElementById('importTrackList');
+  let stageSwapTimer = null;
+
+  const setImportStage = (text) => {
+    clearTimeout(stageSwapTimer);
+    stageEl.classList.add('updating');
+    stageSwapTimer = setTimeout(() => {
+      stageEl.textContent = text || '';
+      stageEl.classList.remove('updating');
+    }, 120);
+  };
+
+  const syncImportCardState = () => {
+    const showTrackMeta =
+      trackProgEl.classList.contains('visible') ||
+      trackListEl.classList.contains('visible') ||
+      !!trackListEl.children.length;
+    statusEl.classList.toggle('expanded', showTrackMeta);
+  };
 
   // Reset UI
   btn.disabled = true;
+  urlInput.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Loading…';
   statusEl.style.display = 'block';
+  statusEl.classList.remove('expanded', 'live');
+  requestAnimationFrame(() => statusEl.classList.add('live'));
   artEl.innerHTML = '🎵';
   titleEl.textContent = 'Connecting…';
   artistEl.textContent = '';
   stageEl.textContent = '';
   barEl.style.width = '0%';
-  trackProgEl.style.display = 'none';
-  trackListEl.style.display = 'none';
+  trackProgEl.style.display = 'block';
+  trackListEl.style.display = 'block';
+  trackProgEl.classList.remove('visible');
+  trackListEl.classList.remove('visible');
   trackListEl.innerHTML = '';
+  syncImportCardState();
 
   let completedFile = null;
   let completedTitle = 'track';
@@ -2219,7 +2269,7 @@ document.getElementById('urlLoadBtn').addEventListener('click', () => {
 
   es.addEventListener('stage', e => {
     const d = JSON.parse(e.data);
-    stageEl.textContent = d.message;
+    setImportStage(d.message);
   });
 
   es.addEventListener('metadata', e => {
@@ -2232,16 +2282,17 @@ document.getElementById('urlLoadBtn').addEventListener('click', () => {
       artEl.innerHTML = `<img src="${d.image_url}" alt="album art">`;
     }
     if (d.total_tracks > 1) {
-      trackListEl.style.display = 'block';
+      trackListEl.classList.add('visible');
+      syncImportCardState();
     }
   });
 
   es.addEventListener('found', e => {
     const d = JSON.parse(e.data);
     foundYouTubeUrl = d.youtube_url || foundYouTubeUrl;
-    stageEl.textContent = d.fallback
+    setImportStage(d.fallback
       ? 'No exact match — searching YouTube…'
-      : 'Found on YouTube Music';
+      : 'Found on YouTube Music');
   });
 
   es.addEventListener('progress', e => {
@@ -2251,7 +2302,7 @@ document.getElementById('urlLoadBtn').addEventListener('click', () => {
 
   es.addEventListener('track_start', e => {
     const d = JSON.parse(e.data);
-    trackProgEl.style.display = 'block';
+    trackProgEl.classList.add('visible');
     trackProgEl.textContent = `${d.artist} – ${d.title}`;
     barEl.style.width = '0%';
     const item = document.createElement('div');
@@ -2260,6 +2311,7 @@ document.getElementById('urlLoadBtn').addEventListener('click', () => {
     item.innerHTML = `<span class="import-track-num">${d.index + 1}</span>${d.artist} – ${d.title}`;
     trackListEl.appendChild(item);
     item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    syncImportCardState();
   });
 
   es.addEventListener('track_complete', e => {
@@ -2270,6 +2322,7 @@ document.getElementById('urlLoadBtn').addEventListener('click', () => {
       item.className = 'import-track-item done';
       item.innerHTML = `<span class="import-track-check">✓</span>${d.artist} – ${d.title}`;
     }
+    syncImportCardState();
   });
 
   es.addEventListener('track_error', e => {
@@ -2279,13 +2332,14 @@ document.getElementById('urlLoadBtn').addEventListener('click', () => {
       item.className = 'import-track-item done';
       item.innerHTML = `<span class="import-track-err">✗</span>${d.title}`;
     }
+    syncImportCardState();
   });
 
   es.addEventListener('complete', async e => {
     es.close();
     const d = JSON.parse(e.data);
     const file = d.file || completedFile;
-    stageEl.textContent = '✓ Done — loading into studio…';
+    setImportStage('✓ Done — loading into studio…');
     barEl.style.width = '100%';
     try {
       const fileRes = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(file)}&consume=1`);
@@ -2298,11 +2352,13 @@ document.getElementById('urlLoadBtn').addEventListener('click', () => {
       await loadFile(ab, completedTitle + '.mp3', { sourceLinks });
       document.getElementById('urlInput').value = '';
       statusEl.style.display = 'none';
+      statusEl.classList.remove('expanded', 'live');
     } catch (err) {
-      stageEl.textContent = '✗ ' + err.message;
+      setImportStage('✗ ' + err.message);
       toast('Error: ' + err.message, 5000);
     } finally {
       btn.disabled = false;
+      urlInput.disabled = false;
       btn.textContent = 'Load';
     }
   });
@@ -2311,17 +2367,19 @@ document.getElementById('urlLoadBtn').addEventListener('click', () => {
     es.close();
     let msg = 'Download failed';
     try { msg = JSON.parse(e.data).message; } catch {}
-    stageEl.textContent = '✗ ' + msg;
+    setImportStage('✗ ' + msg);
     toast('Error: ' + msg, 5000);
     btn.disabled = false;
+    urlInput.disabled = false;
     btn.textContent = 'Load';
   });
 
   es.onerror = () => {
     if (es.readyState === EventSource.CLOSED) return;
     es.close();
-    stageEl.textContent = '✗ Connection lost';
+    setImportStage('✗ Connection lost');
     btn.disabled = false;
+    urlInput.disabled = false;
     btn.textContent = 'Load';
   };
 });
