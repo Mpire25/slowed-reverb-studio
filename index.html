@@ -1097,7 +1097,9 @@ function pause() {
 
 function currentPosition() {
   if (!state.playing || !state.audioCtx) return state.pausedAt;
+  if (!state.duration) return 0;
   const elapsed = (state.audioCtx.currentTime - state.startTime) * state.speed;
+  if (state.loopEnabled) return elapsed % state.duration;
   return Math.min(elapsed, state.duration);
 }
 
@@ -1390,7 +1392,13 @@ document.getElementById('endBtn').addEventListener('click', () => {
 });
 
 document.getElementById('loopBtn').addEventListener('click', () => {
+  const wasLooping = state.loopEnabled;
+  const loopPos = wasLooping ? currentPosition() : 0;
   state.loopEnabled = !state.loopEnabled;
+  if (wasLooping && !state.loopEnabled && state.playing && state.audioCtx) {
+    // Rebase elapsed time so UI stays in sync after disabling loop mid-playback.
+    state.startTime = state.audioCtx.currentTime - loopPos / state.speed;
+  }
   if (state.source) state.source.loop = state.loopEnabled;
   updateLoopBtn();
   document.getElementById('loopBtn').title = state.loopEnabled ? 'Loop On' : 'Loop Off';
