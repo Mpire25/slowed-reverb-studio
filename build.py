@@ -146,11 +146,25 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 .effects h3{font-size:.8rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:14px;padding:0 2px}
 .slider-group{display:flex;flex-direction:column;gap:14px}
 .slider-row{display:flex;align-items:center;gap:14px}
+.slider-input-wrap{position:relative;flex:1;display:flex;align-items:center}
 .slider-label{font-size:.825rem;color:var(--muted);min-width:90px;flex-shrink:0}
 .slider-value{font-size:.825rem;color:var(--text);min-width:44px;text-align:right;font-variant-numeric:tabular-nums;flex-shrink:0}
 input[type=range]{
   flex:1;-webkit-appearance:none;appearance:none;height:4px;border-radius:4px;outline:none;cursor:pointer;
   background:var(--border);position:relative;
+}
+.slider-input-wrap input[type=range]{width:100%}
+.speed-slider-wrap .speed-divider{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  width:2px;
+  height:14px;
+  border-radius:999px;
+  background:rgba(255,255,255,.45);
+  box-shadow:0 0 0 1px rgba(0,0,0,.2);
+  pointer-events:none;
 }
 input[type=range]::-webkit-slider-thumb{
   -webkit-appearance:none;width:18px;height:18px;border-radius:50%;
@@ -305,7 +319,10 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
     <div class="slider-group">
       <div class="slider-row">
         <span class="slider-label">Speed</span>
-        <input type="range" id="speedSlider" min="50" max="150" value="75" step="1" aria-label="Speed">
+        <div class="slider-input-wrap speed-slider-wrap">
+          <input type="range" id="speedSlider" min="50" max="150" value="75" step="1" aria-label="Speed">
+          <span class="speed-divider" aria-hidden="true"></span>
+        </div>
         <span class="slider-value" id="speedVal">0.75×</span>
       </div>
       <div class="slider-row">
