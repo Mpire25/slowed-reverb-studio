@@ -290,13 +290,18 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
   z-index:60;
   pointer-events:none;
   opacity:0;
-  transition:opacity .42s ease;
-  filter:blur(12px) saturate(118%);
-  transform:translateY(28px);
+  transition:opacity 1.35s cubic-bezier(.22,.61,.36,1), transform 1.35s cubic-bezier(.22,.61,.36,1), filter 1.35s cubic-bezier(.22,.61,.36,1);
+  filter:blur(19px) saturate(102%) brightness(.88);
+  transform:translateY(42px) scale(1.035);
   -webkit-mask-image:linear-gradient(to top,rgba(0,0,0,.95) 0%,rgba(0,0,0,.85) 28%,rgba(0,0,0,.45) 62%,rgba(0,0,0,0) 100%);
   mask-image:linear-gradient(to top,rgba(0,0,0,.95) 0%,rgba(0,0,0,.85) 28%,rgba(0,0,0,.45) 62%,rgba(0,0,0,0) 100%);
 }
-.bottom-visualizer.active{opacity:.92}
+.bottom-visualizer.active{
+  transition:opacity .82s cubic-bezier(.25,.8,.25,1), transform .82s cubic-bezier(.25,.8,.25,1), filter .82s cubic-bezier(.25,.8,.25,1);
+  opacity:.96;
+  filter:blur(12px) saturate(122%) brightness(1.04);
+  transform:translateY(26px) scale(1);
+}
 .bottom-visualizer.off{opacity:0}
 
 /* ── Progress / toast ── */
@@ -1290,7 +1295,7 @@ function updateBottomVisualizerPlaybackState() {
 }
 
 const VISUALIZER_TUNING = {
-  smoothing: 0.62,       // lower = more reactive
+  smoothing: 0.52,       // lower = more reactive
   ampA: 0.36,
   ampB: 0.32,
   ampC: 0.26,
