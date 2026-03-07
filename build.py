@@ -175,11 +175,11 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
 .download-btn.hidden{display:none}
 
 /* ── Settings panel ── */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99;opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(2px)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:140;opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(2px)}
 .overlay.open{opacity:1;pointer-events:auto}
 .settings-panel{
   position:fixed;top:0;right:0;bottom:0;width:320px;max-width:90vw;
-  background:#111118;border-left:1px solid var(--border);z-index:100;
+  background:#111118;border-left:1px solid var(--border);z-index:150;
   transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);
   padding:28px 24px;overflow-y:auto;
 }
