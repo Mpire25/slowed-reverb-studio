@@ -1100,6 +1100,13 @@ document.getElementById('urlLoadBtn').addEventListener('click', async () => {
   }
 });
 
+document.getElementById('urlInput').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const loadBtn = document.getElementById('urlLoadBtn');
+  if (!loadBtn.disabled) loadBtn.click();
+});
+
 // ─── Download ────────────────────────────────────────────────────────────────
 document.getElementById('downloadBtn').addEventListener('click', () => {
   if (!state.audioBuffer) return;

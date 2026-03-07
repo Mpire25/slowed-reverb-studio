@@ -289,13 +289,14 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
   height:170px;
   z-index:60;
   pointer-events:none;
-  opacity:.92;
-  transition:opacity .22s ease;
+  opacity:0;
+  transition:opacity .42s ease;
   filter:blur(12px) saturate(118%);
   transform:translateY(28px);
   -webkit-mask-image:linear-gradient(to top,rgba(0,0,0,.95) 0%,rgba(0,0,0,.85) 28%,rgba(0,0,0,.45) 62%,rgba(0,0,0,0) 100%);
   mask-image:linear-gradient(to top,rgba(0,0,0,.95) 0%,rgba(0,0,0,.85) 28%,rgba(0,0,0,.45) 62%,rgba(0,0,0,0) 100%);
 }
+.bottom-visualizer.active{opacity:.92}
 .bottom-visualizer.off{opacity:0}
 
 /* ── Progress / toast ── */
@@ -917,6 +918,7 @@ function syncSettingsUI() {
   updateLoopBtn();
   document.getElementById('loopBtn').title = state.loopEnabled ? 'Loop On' : 'Loop Off';
   updateBottomVisualizerVisibility();
+  updateBottomVisualizerPlaybackState();
   drawBottomVisualizer(!state.playing);
 }
 
@@ -1154,13 +1156,14 @@ function createSource(ctx, offset) {
       state.pausedAt = 0;
       state.source = null;
       updatePlayBtn();
-      drawBottomVisualizer(true);
+      updateBottomVisualizerPlaybackState();
     }
   };
   state.source = src;
   src.start(0, offset);
   state.startTime = ctx.currentTime - offset / state.speed;
   state.playing = true;
+  updateBottomVisualizerPlaybackState();
 }
 
 // ─── Playback ────────────────────────────────────────────────────────────────
@@ -1181,7 +1184,7 @@ function pause() {
   try { state.source.stop(); } catch(e) {}
   try { state.source.disconnect(); } catch(e) {}
   state.source = null;
-  drawBottomVisualizer(true);
+  updateBottomVisualizerPlaybackState();
 }
 
 function currentPosition() {
@@ -1280,6 +1283,22 @@ function updateBottomVisualizerVisibility() {
   canvas.classList.toggle('off', !state.visualizerEnabled);
 }
 
+function updateBottomVisualizerPlaybackState() {
+  const canvas = document.getElementById('bottomVisualizer');
+  const active = state.visualizerEnabled && state.playing && !!state.audioBuffer;
+  canvas.classList.toggle('active', active);
+}
+
+const VISUALIZER_TUNING = {
+  smoothing: 0.62,       // lower = more reactive
+  ampA: 0.36,
+  ampB: 0.32,
+  ampC: 0.26,
+  driftBase: 5,
+  driftBassBoost: 16,
+  driftMidBoost: 8,
+};
+
 function drawBottomVisualizer(clearOnly = false) {
   const canvas = document.getElementById('bottomVisualizer');
   const dpr = window.devicePixelRatio || 1;
@@ -1350,7 +1369,7 @@ function drawBottomVisualizer(clearOnly = false) {
     let sum = 0;
     for (let j = 0; j < step; j++) sum += state.visualizerFreqData[start + j] || 0;
     const raw = (sum / step) / 255;
-    state.visualizerBarData[i] = state.visualizerBarData[i] * 0.8 + raw * 0.2;
+    state.visualizerBarData[i] = state.visualizerBarData[i] * VISUALIZER_TUNING.smoothing + raw * (1 - VISUALIZER_TUNING.smoothing);
   }
 
   function drawWave(yBase, ampScale, colorA, colorB, alpha, lineW, speed, freq) {
@@ -1368,7 +1387,8 @@ function drawBottomVisualizer(clearOnly = false) {
       const t = i / (pointCount - 1);
       const x = t * W;
       const amp = Math.pow(state.visualizerBarData[i], 1.2) * (H * ampScale);
-      const drift = Math.sin(now * speed + t * freq) * (2 + bass * 6);
+      const drift = Math.sin(now * speed + t * freq) *
+        (VISUALIZER_TUNING.driftBase + bass * VISUALIZER_TUNING.driftBassBoost + lowMid * VISUALIZER_TUNING.driftMidBoost);
       const y = yBase - amp - drift;
       if (i === 0) {
         firstY = y;
@@ -1379,7 +1399,8 @@ function drawBottomVisualizer(clearOnly = false) {
         const prevX = prevT * W;
         const cx = (prevX + x) * 0.5;
         const prevAmp = Math.pow(state.visualizerBarData[i - 1], 1.2) * (H * ampScale);
-        const prevDrift = Math.sin(now * speed + prevT * freq) * (2 + bass * 6);
+        const prevDrift = Math.sin(now * speed + prevT * freq) *
+          (VISUALIZER_TUNING.driftBase + bass * VISUALIZER_TUNING.driftBassBoost + lowMid * VISUALIZER_TUNING.driftMidBoost);
         const prevY = yBase - prevAmp - prevDrift;
         ctx2d.quadraticCurveTo(prevX, prevY, cx, (prevY + y) * 0.5);
       }
@@ -1390,10 +1411,10 @@ function drawBottomVisualizer(clearOnly = false) {
 
   ctx2d.shadowBlur = 24;
   ctx2d.shadowColor = 'rgba(124,58,237,0.2)';
-  drawWave(H * 0.86, 0.22, 'rgba(124,58,237,0.6)', 'rgba(6,182,212,0.5)', 0.58, 18, 1.2, 8.8);
-  drawWave(H * 0.78, 0.2, 'rgba(167,139,250,0.55)', 'rgba(34,211,238,0.48)', 0.48, 14, 1.55, 10.2);
+  drawWave(H * 0.86, VISUALIZER_TUNING.ampA, 'rgba(124,58,237,0.6)', 'rgba(6,182,212,0.5)', 0.58, 18, 1.2, 8.8);
+  drawWave(H * 0.78, VISUALIZER_TUNING.ampB, 'rgba(167,139,250,0.55)', 'rgba(34,211,238,0.48)', 0.48, 14, 1.55, 10.2);
   ctx2d.shadowBlur = 0;
-  drawWave(H * 0.71, 0.16, 'rgba(196,181,253,0.42)', 'rgba(103,232,249,0.35)', 0.34, 10, 1.8, 11.4);
+  drawWave(H * 0.71, VISUALIZER_TUNING.ampC, 'rgba(196,181,253,0.42)', 'rgba(103,232,249,0.35)', 0.34, 10, 1.8, 11.4);
 
   ctx2d.globalAlpha = 1;
   ctx2d.setTransform(1,0,0,1,0,0);
@@ -1492,7 +1513,7 @@ function showPlayerUI(show) {
     drawWaveform();
     drawBottomVisualizer(!state.playing);
   } else {
-    drawBottomVisualizer(true);
+    updateBottomVisualizerPlaybackState();
   }
 }
 
@@ -1538,7 +1559,7 @@ function resetStudio() {
   showPlayerUI(false);
   updatePlayBtn();
   updateSourceImportUI();
-  drawBottomVisualizer(true);
+  updateBottomVisualizerPlaybackState();
 }
 
 // ─── Effect Sliders ──────────────────────────────────────────────────────────
@@ -1617,9 +1638,9 @@ document.getElementById('endBtn').addEventListener('click', () => {
     try { state.source.stop(); state.source.disconnect(); } catch(e) {}
     state.source = null;
     updatePlayBtn();
+    updateBottomVisualizerPlaybackState();
   }
   drawWaveform();
-  drawBottomVisualizer(true);
   updateTimeDisplay();
 });
 
@@ -1843,6 +1864,13 @@ document.getElementById('urlLoadBtn').addEventListener('click', () => {
   };
 });
 
+document.getElementById('urlInput').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const loadBtn = document.getElementById('urlLoadBtn');
+  if (!loadBtn.disabled) loadBtn.click();
+});
+
 // ─── Download ────────────────────────────────────────────────────────────────
 document.getElementById('downloadBtn').addEventListener('click', () => {
   if (!state.audioBuffer) return;
@@ -2037,6 +2065,7 @@ document.getElementById('bottomVisualizerToggle').addEventListener('change', e =
   state.visualizerEnabled = settings.visualizerEnabled;
   saveSettings();
   updateBottomVisualizerVisibility();
+  updateBottomVisualizerPlaybackState();
   drawBottomVisualizer(!state.playing);
 });
 
