@@ -36,8 +36,11 @@ def run_script(script_dir, url):
     downloads_dir = script_dir / "downloads"
     before = set(downloads_dir.glob("*.mp3")) if downloads_dir.exists() else set()
 
+    venv_python = script_dir / ".venv" / "bin" / "python3"
+    python = str(venv_python) if venv_python.exists() else sys.executable
+
     result = subprocess.run(
-        [sys.executable, "main.py", url],
+        [python, "main.py", url],
         cwd=str(script_dir),
         capture_output=True,
         text=True,
