@@ -267,18 +267,59 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
   margin-bottom:0;
   color:var(--text);
 }
-.setting-toggle span{
+.setting-toggle > span:first-child{
   font-size:.9rem;
   text-transform:none;
   letter-spacing:0;
 }
-.setting-toggle input[type=checkbox]{
-  width:18px;
-  height:18px;
-  accent-color:#7c3aed;
-  cursor:pointer;
+.apple-switch{
+  position:relative;
+  width:52px;
+  height:32px;
+  display:inline-block;
+  flex:0 0 auto;
 }
-
+.apple-switch input{
+  position:absolute;
+  inset:0;
+  margin:0;
+  width:100%;
+  height:100%;
+  opacity:0;
+  cursor:pointer;
+  z-index:2;
+}
+.apple-switch-track{
+  position:absolute;
+  inset:0;
+  border-radius:999px;
+  background:#3a3a44;
+  border:1px solid rgba(255,255,255,.16);
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.35);
+  transition:background .18s ease,border-color .18s ease;
+}
+.apple-switch-thumb{
+  position:absolute;
+  top:3px;
+  left:3px;
+  width:24px;
+  height:24px;
+  border-radius:50%;
+  background:#fff;
+  box-shadow:0 2px 8px rgba(0,0,0,.35);
+  transition:transform .18s cubic-bezier(.4,0,.2,1);
+}
+.apple-switch input:checked + .apple-switch-track{
+  background:#34c759;
+  border-color:#34c759;
+}
+.apple-switch input:checked + .apple-switch-track .apple-switch-thumb{
+  transform:translateX(20px);
+}
+.apple-switch input:focus-visible + .apple-switch-track{
+  outline:2px solid rgba(52,199,89,.55);
+  outline-offset:2px;
+}
 /* ── Download modal ── */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;backdrop-filter:blur(4px)}
 .modal-overlay.open{opacity:1;pointer-events:auto}
@@ -378,7 +419,7 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
         </svg>
       </button>
     </div>
-  </header>
+</header>
 
 <div class="app">
 
@@ -515,13 +556,23 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
   <div class="setting-group">
     <label class="setting-toggle">
       <span>Bottom Visualizer</span>
-      <input type="checkbox" id="bottomVisualizerToggle" checked>
+      <span class="apple-switch">
+        <input type="checkbox" id="bottomVisualizerToggle" checked>
+        <span class="apple-switch-track">
+          <span class="apple-switch-thumb"></span>
+        </span>
+      </span>
     </label>
   </div>
   <div class="setting-group">
     <label class="setting-toggle">
       <span>Album Art Theme</span>
-      <input type="checkbox" id="artThemeToggle">
+      <span class="apple-switch">
+        <input type="checkbox" id="artThemeToggle">
+        <span class="apple-switch-track">
+          <span class="apple-switch-thumb"></span>
+        </span>
+      </span>
     </label>
   </div>
 </div>
@@ -1612,12 +1663,6 @@ function drawBottomVisualizer(clearOnly = false) {
   }
 
   const fading = isBottomVisualizerFading();
-  if (!state.playing && !fading) {
-    clearBottomVisualizerFade();
-    updateBottomVisualizerPlaybackState();
-    ctx2d.setTransform(1, 0, 0, 1, 0, 0);
-    return;
-  }
 
   const pointCount = Math.max(22, Math.floor(W / 26));
   if (!state.visualizerBarData || state.visualizerBarData.length !== pointCount) {
@@ -1774,7 +1819,6 @@ function drawBottomVisualizer(clearOnly = false) {
 
   if (!state.playing && performance.now() >= state.visualizerFadeOutUntil) {
     clearBottomVisualizerFade();
-    updateBottomVisualizerPlaybackState();
   }
 
   ctx2d.globalAlpha = 1;
@@ -2466,6 +2510,45 @@ document.getElementById('artThemeToggle').addEventListener('change', e => {
   settings.artThemeEnabled = e.target.checked;
   saveSettings();
   void applyThemeFromCurrentTrack();
+});
+
+function bindVizDebugSlider(inputId, valueId, applyValue) {
+  const input = document.getElementById(inputId);
+  const valueEl = document.getElementById(valueId);
+  if (!input || !valueEl) return;
+  input.addEventListener('input', () => {
+    applyValue(+input.value);
+    if (valueId === 'vizFadeCurveVal') valueEl.textContent = settings.vizFadeCurve.toFixed(2);
+    else if (valueId === 'vizFadeOutMsVal') valueEl.textContent = fmtMs(settings.vizFadeOutMs);
+    else if (valueId === 'vizExitMsVal') valueEl.textContent = fmtMs(settings.vizExitMs);
+    else if (valueId === 'vizEnterMsVal') valueEl.textContent = fmtMs(settings.vizEnterMs);
+    applyVisualizerDebugStyles();
+    drawBottomVisualizer(!state.playing);
+  });
+  input.addEventListener('change', saveSettings);
+}
+
+bindVizDebugSlider('vizFadeOutMs', 'vizFadeOutMsVal', v => {
+  settings.vizFadeOutMs = Math.max(VIZ_MIN_MS, Math.min(VIZ_MAX_MS, v));
+});
+bindVizDebugSlider('vizFadeCurve', 'vizFadeCurveVal', v => {
+  settings.vizFadeCurve = Math.max(VIZ_MIN_FADE_CURVE, Math.min(VIZ_MAX_FADE_CURVE, v));
+});
+bindVizDebugSlider('vizExitMs', 'vizExitMsVal', v => {
+  settings.vizExitMs = Math.max(VIZ_MIN_MS, Math.min(VIZ_MAX_MS, v));
+});
+bindVizDebugSlider('vizEnterMs', 'vizEnterMsVal', v => {
+  settings.vizEnterMs = Math.max(VIZ_MIN_MS, Math.min(VIZ_MAX_MS, v));
+});
+document.getElementById('vizResetBtn').addEventListener('click', () => {
+  settings.vizFadeOutMs = DEFAULT_VIZ_DEBUG.fadeOutMs;
+  settings.vizFadeCurve = DEFAULT_VIZ_DEBUG.fadeCurve;
+  settings.vizExitMs = DEFAULT_VIZ_DEBUG.exitMs;
+  settings.vizEnterMs = DEFAULT_VIZ_DEBUG.enterMs;
+  syncVisualizerDebugUI();
+  saveSettings();
+  updateBottomVisualizerPlaybackState();
+  drawBottomVisualizer(!state.playing);
 });
 
 // ─── Resize waveform on window resize ────────────────────────────────────────
