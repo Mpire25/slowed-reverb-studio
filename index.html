@@ -1725,8 +1725,7 @@ function drawBottomVisualizer(clearOnly = false) {
     high = getEnergy(0.22, 0.55);
   } else if (fading && state.visualizerFadeBars) {
     const nowMs = performance.now();
-    const fadeDurationMs = Math.max(1, VISUALIZER_FADE_OUT_MS);
-    const fadeProgress = Math.min(1, Math.max(0, 1 - ((state.visualizerFadeOutUntil - nowMs) / fadeDurationMs)));
+    const fadeProgress = Math.min(1, Math.max(0, 1 - ((state.visualizerFadeOutUntil - nowMs) / VISUALIZER_FADE_OUT_MS)));
     const fadeGain = Math.pow(1 - fadeProgress, VISUALIZER_FADE_CURVE);
     for (let i = 0; i < pointCount; i++) {
       const sourceIndex = Math.floor((i / pointCount) * state.visualizerFadeBars.length);
