@@ -1046,7 +1046,13 @@ function buildPipeline(ctx) {
 }
 
 function createSource(ctx, offset) {
-  if (state.source) { try { state.source.stop(); state.source.disconnect(); } catch(e) {} }
+  if (state.source) {
+    try {
+      state.source.onended = null;
+      state.source.stop();
+      state.source.disconnect();
+    } catch(e) {}
+  }
   const src = ctx.createBufferSource();
   src.buffer = state.audioBuffer;
   src.playbackRate.value = state.speed;
@@ -1054,9 +1060,12 @@ function createSource(ctx, offset) {
   src.connect(state.dryGain);
   src.connect(state.convolver);
   src.onended = () => {
+    // Ignore stale nodes that were stopped/replaced during pause/seek/rebuild.
+    if (state.source !== src) return;
     if (state.playing) {
       state.playing = false;
       state.pausedAt = 0;
+      state.source = null;
       updatePlayBtn();
     }
   };
@@ -1079,9 +1088,11 @@ function play() {
 function pause() {
   if (!state.source) return;
   state.pausedAt = currentPosition();
-  try { state.source.stop(); } catch(e) {}
   state.playing = false;
   updatePlayBtn();
+  try { state.source.stop(); } catch(e) {}
+  try { state.source.disconnect(); } catch(e) {}
+  state.source = null;
 }
 
 function currentPosition() {
