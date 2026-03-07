@@ -331,10 +331,6 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
   <button class="close-btn" id="closeSettings">×</button>
   <h2>Settings</h2>
   <div class="setting-group">
-    <label>Filename Suffix</label>
-    <input type="text" id="suffixSetting" value=" (Slowed and Reverb)">
-  </div>
-  <div class="setting-group">
     <label>Default Speed (×)</label>
     <input type="number" id="defaultSpeed" value="0.75" min="0.5" max="1.5" step="0.05">
   </div>
@@ -404,7 +400,6 @@ const state = {
 };
 
 const settings = {
-  suffix: ' (Slowed and Reverb)',
   defaultSpeed: 0.75,
   defaultReverb: 40,
   defaultDecay: 3,
@@ -419,16 +414,13 @@ function clampSpeed(speed) {
   return Math.min(MAX_SPEED, Math.max(MIN_SPEED, speed));
 }
 
-function getExportSuffix(speed = state.speed) {
-  const base = settings.suffix || '';
-  if (speed > 1) {
-    return base
-      .replace(/slowed and reverb/ig, 'Sped Up and Reverb')
-      .replace(/slowed/ig, 'Sped Up');
-  }
-  return base
-    .replace(/sped up and reverb/ig, 'Slowed and Reverb')
-    .replace(/sped up/ig, 'Slowed');
+function getExportSuffix(speed = state.speed, mix = state.reverbMix) {
+  const EPSILON = 0.001;
+  const parts = [];
+  if (speed > 1 + EPSILON) parts.push('Sped Up');
+  else if (speed < 1 - EPSILON) parts.push('Slowed');
+  if (mix > EPSILON) parts.push('Reverb');
+  return parts.length ? ` (${parts.join(' and ')})` : '';
 }
 
 function loadSettings() {
@@ -437,7 +429,6 @@ function loadSettings() {
     if (!raw) return;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return;
-    if (typeof parsed.suffix === 'string') settings.suffix = parsed.suffix;
     if (Number.isFinite(parsed.defaultSpeed)) settings.defaultSpeed = clampSpeed(parsed.defaultSpeed);
     if (Number.isFinite(parsed.defaultReverb)) settings.defaultReverb = parsed.defaultReverb;
     if (Number.isFinite(parsed.defaultDecay)) settings.defaultDecay = parsed.defaultDecay;
@@ -456,7 +447,6 @@ function saveSettings() {
 }
 
 function syncSettingsUI() {
-  document.getElementById('suffixSetting').value = settings.suffix;
   document.getElementById('defaultSpeed').value = settings.defaultSpeed;
   document.getElementById('defaultReverb').value = settings.defaultReverb;
   document.getElementById('defaultDecay').value = settings.defaultDecay;
@@ -1251,10 +1241,6 @@ document.getElementById('overlay').addEventListener('click', closeSettings);
 
 syncSettingsUI();
 
-document.getElementById('suffixSetting').addEventListener('input', e => {
-  settings.suffix = e.target.value;
-  saveSettings();
-});
 document.getElementById('defaultSpeed').addEventListener('change', e => {
   settings.defaultSpeed = clampSpeed(+e.target.value);
   e.target.value = settings.defaultSpeed;

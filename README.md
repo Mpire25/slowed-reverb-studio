@@ -12,11 +12,11 @@ Open `index.html` in your browser (double-click, or serve via the Flask server).
    - **Reverb Mix** — dry/wet blend (default 40%)
    - **Reverb Decay** — tail length in seconds (default 3s)
 3. Hit play to preview
-4. Click **Download MP3** → confirm the filename → exports with correct ID3 tags (title, artist, album art) and a configurable suffix (default: ` (Slowed and Reverb)`, auto-switches to `Sped Up` wording when speed > `1.0×`)
+4. Click **Download MP3** → confirm the filename → exports with correct ID3 tags (title, artist, album art). The suggested name auto-adds `Slowed`/`Sped Up` and `Reverb` only when those effects are active.
 
 Keyboard shortcut: `Space` to play/pause. Click the waveform to seek.
 
-The gear icon (top right) opens settings to change the filename suffix and default slider values.
+The gear icon (top right) opens settings to change default slider values.
 
 ---
 
