@@ -899,6 +899,9 @@ const state = {
   visualizerBarData: null,
   visualizerTimeData: null,
   visualizerLoudness: 0,
+  visualizerFadeOutUntil: 0,
+  visualizerFadeBars: null,
+  visualizerFadeLoudness: 0,
   themeCurrent: { ...DEFAULT_THEME },
   themeTarget: { ...DEFAULT_THEME },
   themeAnimFrame: null,
@@ -1399,6 +1402,7 @@ function createSource(ctx, offset) {
       state.playing = false;
       state.pausedAt = 0;
       state.source = null;
+      beginBottomVisualizerFade();
       updatePlayBtn();
       updateBottomVisualizerPlaybackState();
     }
@@ -1414,6 +1418,7 @@ function createSource(ctx, offset) {
 function play() {
   const ctx = getCtx();
   if (ctx.state === 'suspended') ctx.resume();
+  clearBottomVisualizerFade();
   buildPipeline(ctx);
   createSource(ctx, state.pausedAt);
   updatePlayBtn();
@@ -1424,6 +1429,7 @@ function pause() {
   if (!state.source) return;
   state.pausedAt = currentPosition();
   state.playing = false;
+  beginBottomVisualizerFade();
   updatePlayBtn();
   try { state.source.stop(); } catch(e) {}
   try { state.source.disconnect(); } catch(e) {}
@@ -1537,9 +1543,38 @@ function updateBottomVisualizerVisibility() {
   canvas.classList.toggle('off', !state.visualizerEnabled);
 }
 
+const VISUALIZER_FADE_OUT_MS = 420;
+const VISUALIZER_CSS_HANDOFF_GAIN = 0.34;
+
+function isBottomVisualizerFading() {
+  return !state.playing &&
+    state.visualizerFadeOutUntil > performance.now() &&
+    !!state.visualizerFadeBars &&
+    state.visualizerFadeBars.length > 0;
+}
+
+function clearBottomVisualizerFade() {
+  state.visualizerFadeOutUntil = 0;
+  state.visualizerFadeBars = null;
+  state.visualizerFadeLoudness = 0;
+}
+
+function beginBottomVisualizerFade() {
+  if (!state.visualizerEnabled || !state.audioBuffer || !state.visualizerBarData || state.visualizerBarData.length === 0) {
+    clearBottomVisualizerFade();
+    updateBottomVisualizerPlaybackState();
+    return;
+  }
+  state.visualizerFadeBars = new Float32Array(state.visualizerBarData);
+  state.visualizerFadeLoudness = state.visualizerLoudness;
+  state.visualizerFadeOutUntil = performance.now() + VISUALIZER_FADE_OUT_MS;
+  updateBottomVisualizerPlaybackState();
+  startAnimLoop();
+}
+
 function updateBottomVisualizerPlaybackState() {
   const canvas = document.getElementById('bottomVisualizer');
-  const active = state.visualizerEnabled && state.playing && !!state.audioBuffer;
+  const active = state.visualizerEnabled && !!state.audioBuffer && (state.playing || isBottomVisualizerFading());
   canvas.classList.toggle('active', active);
 }
 
@@ -1571,50 +1606,97 @@ function drawBottomVisualizer(clearOnly = false) {
   ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx2d.clearRect(0, 0, W, H);
 
-  if (clearOnly || !state.visualizerEnabled || !state.playing || !state.analyser) {
+  if (clearOnly || !state.visualizerEnabled) {
     ctx2d.setTransform(1, 0, 0, 1, 0, 0);
     return;
   }
 
-  const analyser = state.analyser;
-  const binCount = analyser.frequencyBinCount;
-  if (!state.visualizerFreqData || state.visualizerFreqData.length !== binCount) {
-    state.visualizerFreqData = new Uint8Array(binCount);
+  const fading = isBottomVisualizerFading();
+  if (!state.playing && !fading) {
+    clearBottomVisualizerFade();
+    updateBottomVisualizerPlaybackState();
+    ctx2d.setTransform(1, 0, 0, 1, 0, 0);
+    return;
   }
-  if (!state.visualizerTimeData || state.visualizerTimeData.length !== analyser.fftSize) {
-    state.visualizerTimeData = new Uint8Array(analyser.fftSize);
-  }
-  analyser.getByteFrequencyData(state.visualizerFreqData);
-  analyser.getByteTimeDomainData(state.visualizerTimeData);
-  const now = Date.now() * 0.001;
-
-  let rmsSum = 0;
-  for (let i = 0; i < state.visualizerTimeData.length; i += 2) {
-    const sample = (state.visualizerTimeData[i] - 128) / 128;
-    rmsSum += sample * sample;
-  }
-  const rms = Math.sqrt(rmsSum / (state.visualizerTimeData.length / 2));
-  const loudnessNow = Math.min(1, rms * 4.5);
-  state.visualizerLoudness = state.visualizerLoudness * 0.82 + loudnessNow * 0.18;
 
   const pointCount = Math.max(22, Math.floor(W / 26));
   if (!state.visualizerBarData || state.visualizerBarData.length !== pointCount) {
     state.visualizerBarData = new Float32Array(pointCount);
   }
-
-  function getEnergy(startPct, endPct) {
-    const start = Math.max(0, Math.floor(binCount * startPct));
-    const end = Math.max(start + 1, Math.floor(binCount * endPct));
+  function getEnergyFromBars(startPct, endPct) {
+    if (!state.visualizerBarData || state.visualizerBarData.length === 0) return 0;
+    const start = Math.max(0, Math.floor(pointCount * startPct));
+    const end = Math.max(start + 1, Math.floor(pointCount * endPct));
     let sum = 0;
-    for (let i = start; i < end; i++) sum += state.visualizerFreqData[i] || 0;
-    return (sum / (end - start)) / 255;
+    for (let i = start; i < end; i++) sum += state.visualizerBarData[i] || 0;
+    return sum / (end - start);
   }
 
-  const bass = getEnergy(0.00, 0.08);
-  const lowMid = getEnergy(0.08, 0.22);
-  const high = getEnergy(0.22, 0.55);
+  let bass = 0;
+  let lowMid = 0;
+  let high = 0;
+  let loudness = 0;
+
+  if (state.playing && state.analyser) {
+    const analyser = state.analyser;
+    const binCount = analyser.frequencyBinCount;
+    if (!state.visualizerFreqData || state.visualizerFreqData.length !== binCount) {
+      state.visualizerFreqData = new Uint8Array(binCount);
+    }
+    if (!state.visualizerTimeData || state.visualizerTimeData.length !== analyser.fftSize) {
+      state.visualizerTimeData = new Uint8Array(analyser.fftSize);
+    }
+    analyser.getByteFrequencyData(state.visualizerFreqData);
+    analyser.getByteTimeDomainData(state.visualizerTimeData);
+
+    let rmsSum = 0;
+    for (let i = 0; i < state.visualizerTimeData.length; i += 2) {
+      const sample = (state.visualizerTimeData[i] - 128) / 128;
+      rmsSum += sample * sample;
+    }
+    const rms = Math.sqrt(rmsSum / (state.visualizerTimeData.length / 2));
+    const loudnessNow = Math.min(1, rms * 4.5);
+    state.visualizerLoudness = state.visualizerLoudness * 0.82 + loudnessNow * 0.18;
+    loudness = state.visualizerLoudness;
+
+    const step = Math.max(1, Math.floor(binCount / pointCount));
+    for (let i = 0; i < pointCount; i++) {
+      const start = i * step;
+      let sum = 0;
+      for (let j = 0; j < step; j++) sum += state.visualizerFreqData[start + j] || 0;
+      const raw = (sum / step) / 255;
+      state.visualizerBarData[i] = state.visualizerBarData[i] * VISUALIZER_TUNING.smoothing + raw * (1 - VISUALIZER_TUNING.smoothing);
+    }
+
+    function getEnergy(startPct, endPct) {
+      const start = Math.max(0, Math.floor(binCount * startPct));
+      const end = Math.max(start + 1, Math.floor(binCount * endPct));
+      let sum = 0;
+      for (let i = start; i < end; i++) sum += state.visualizerFreqData[i] || 0;
+      return (sum / (end - start)) / 255;
+    }
+    bass = getEnergy(0.00, 0.08);
+    lowMid = getEnergy(0.08, 0.22);
+    high = getEnergy(0.22, 0.55);
+  } else if (fading && state.visualizerFadeBars) {
+    const nowMs = performance.now();
+    const fadeProgress = Math.min(1, Math.max(0, 1 - ((state.visualizerFadeOutUntil - nowMs) / VISUALIZER_FADE_OUT_MS)));
+    // Keep some residual energy for the CSS opacity fade handoff.
+    const fadeGain = VISUALIZER_CSS_HANDOFF_GAIN + (1 - VISUALIZER_CSS_HANDOFF_GAIN) * Math.pow(1 - fadeProgress, 1.45);
+    for (let i = 0; i < pointCount; i++) {
+      const sourceIndex = Math.floor((i / pointCount) * state.visualizerFadeBars.length);
+      const held = state.visualizerFadeBars[Math.min(state.visualizerFadeBars.length - 1, sourceIndex)] || 0;
+      state.visualizerBarData[i] = held * fadeGain;
+    }
+    loudness = state.visualizerFadeLoudness * fadeGain;
+    bass = getEnergyFromBars(0.00, 0.08);
+    lowMid = getEnergyFromBars(0.08, 0.22);
+    high = getEnergyFromBars(0.22, 0.55);
+  }
+
+  const now = Date.now() * 0.001;
   const pulse = Math.min(1, bass * 0.55 + lowMid * 0.3 + high * 0.15);
-  const intensity = 0.35 + pulse * 0.45 + state.visualizerLoudness * 0.8;
+  const intensity = 0.35 + pulse * 0.45 + loudness * 0.8;
   const speedNorm = (state.speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED);
   const speedNormClamped = Math.min(1, Math.max(0, speedNorm));
   const rotationRate = 0.32 + Math.pow(speedNormClamped, 0.78) * 0.26;
@@ -1645,15 +1727,6 @@ function drawBottomVisualizer(clearOnly = false) {
   bloomRight.addColorStop(1, `hsla(${hueB.toFixed(1)},94%,55%,0)`);
   ctx2d.fillStyle = bloomRight;
   ctx2d.fillRect(0, 0, W, H);
-
-  const step = Math.max(1, Math.floor(binCount / pointCount));
-  for (let i = 0; i < pointCount; i++) {
-    const start = i * step;
-    let sum = 0;
-    for (let j = 0; j < step; j++) sum += state.visualizerFreqData[start + j] || 0;
-    const raw = (sum / step) / 255;
-    state.visualizerBarData[i] = state.visualizerBarData[i] * VISUALIZER_TUNING.smoothing + raw * (1 - VISUALIZER_TUNING.smoothing);
-  }
 
   function drawWave(yBase, ampScale, colorA, colorB, alpha, lineW, speed, freq) {
     const xShift = (Math.sin(now * (0.06 + speed * 0.02)) * 0.5 + 0.5) * W * 0.28;
@@ -1695,10 +1768,15 @@ function drawBottomVisualizer(clearOnly = false) {
 
   ctx2d.shadowBlur = 24;
   ctx2d.shadowColor = 'rgba(124,58,237,0.2)';
-  drawWave(H - VISUALIZER_TUNING.baseOffsetA, VISUALIZER_TUNING.ampA, `hsla(${hueA.toFixed(1)},90%,60%,0.62)`, `hsla(${hueB.toFixed(1)},92%,56%,0.54)`, 0.34 + state.visualizerLoudness * 0.9, 18, 1.2, 8.8);
-  drawWave(H - VISUALIZER_TUNING.baseOffsetB, VISUALIZER_TUNING.ampB, `hsla(${hueC.toFixed(1)},88%,68%,0.52)`, `hsla(${hueB.toFixed(1)},94%,62%,0.48)`, 0.28 + state.visualizerLoudness * 0.7, 14, 1.55, 10.2);
+  drawWave(H - VISUALIZER_TUNING.baseOffsetA, VISUALIZER_TUNING.ampA, `hsla(${hueA.toFixed(1)},90%,60%,0.62)`, `hsla(${hueB.toFixed(1)},92%,56%,0.54)`, 0.34 + loudness * 0.9, 18, 1.2, 8.8);
+  drawWave(H - VISUALIZER_TUNING.baseOffsetB, VISUALIZER_TUNING.ampB, `hsla(${hueC.toFixed(1)},88%,68%,0.52)`, `hsla(${hueB.toFixed(1)},94%,62%,0.48)`, 0.28 + loudness * 0.7, 14, 1.55, 10.2);
   ctx2d.shadowBlur = 0;
-  drawWave(H - VISUALIZER_TUNING.baseOffsetC, VISUALIZER_TUNING.ampC, `hsla(${hueA.toFixed(1)},76%,80%,0.42)`, `hsla(${hueB.toFixed(1)},86%,76%,0.36)`, 0.24 + state.visualizerLoudness * 0.5, 10, 1.8, 11.4);
+  drawWave(H - VISUALIZER_TUNING.baseOffsetC, VISUALIZER_TUNING.ampC, `hsla(${hueA.toFixed(1)},76%,80%,0.42)`, `hsla(${hueB.toFixed(1)},86%,76%,0.36)`, 0.24 + loudness * 0.5, 10, 1.8, 11.4);
+
+  if (!state.playing && performance.now() >= state.visualizerFadeOutUntil) {
+    clearBottomVisualizerFade();
+    updateBottomVisualizerPlaybackState();
+  }
 
   ctx2d.globalAlpha = 1;
   ctx2d.setTransform(1,0,0,1,0,0);
@@ -1710,7 +1788,7 @@ function startAnimLoop() {
     drawWaveform();
     drawBottomVisualizer();
     updateTimeDisplay();
-    if (state.playing) {
+    if (state.playing || isBottomVisualizerFading()) {
       state.animFrame = requestAnimationFrame(loop);
     }
   }
@@ -1756,6 +1834,7 @@ async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceLinks = 
     state.duration = buf.duration;
     state.pausedAt = 0;
     state.playing = false;
+    clearBottomVisualizerFade();
     if (state.source) { try { state.source.stop(); } catch(e) {} state.source = null; }
 
     state.waveformData = buildWaveformData(buf);
@@ -1846,6 +1925,7 @@ function resetStudio() {
   state.visualizerBarData = null;
   state.visualizerTimeData = null;
   state.visualizerLoudness = 0;
+  clearBottomVisualizerFade();
   state.duration = 0;
   state.pausedAt = 0;
   state.playing = false;
@@ -1942,6 +2022,7 @@ document.getElementById('endBtn').addEventListener('click', () => {
   state.pausedAt = state.duration;
   if (state.source) {
     state.playing = false;
+    beginBottomVisualizerFade();
     try { state.source.stop(); state.source.disconnect(); } catch(e) {}
     state.source = null;
     updatePlayBtn();
