@@ -237,6 +237,27 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
   transition:border-color .2s;
 }
 .setting-group input:focus{border-color:var(--accent1)}
+.setting-toggle{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  text-transform:none;
+  letter-spacing:0;
+  margin-bottom:0;
+  color:var(--text);
+}
+.setting-toggle span{
+  font-size:.9rem;
+  text-transform:none;
+  letter-spacing:0;
+}
+.setting-toggle input[type=checkbox]{
+  width:18px;
+  height:18px;
+  accent-color:#7c3aed;
+  cursor:pointer;
+}
 
 /* ── Download modal ── */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:200;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;backdrop-filter:blur(4px)}
@@ -257,6 +278,25 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
 .modal-cancel:hover{background:rgba(255,255,255,.11)}
 .modal-confirm:hover{opacity:.9}
 .modal-confirm:disabled{opacity:.4;cursor:not-allowed}
+
+/* ── Bottom visualizer ── */
+.bottom-visualizer{
+  position:fixed;
+  left:-8vw;
+  right:auto;
+  bottom:0;
+  width:116vw;
+  height:170px;
+  z-index:60;
+  pointer-events:none;
+  opacity:.92;
+  transition:opacity .22s ease;
+  filter:blur(12px) saturate(118%);
+  transform:translateY(28px);
+  -webkit-mask-image:linear-gradient(to top,rgba(0,0,0,.95) 0%,rgba(0,0,0,.85) 28%,rgba(0,0,0,.45) 62%,rgba(0,0,0,0) 100%);
+  mask-image:linear-gradient(to top,rgba(0,0,0,.95) 0%,rgba(0,0,0,.85) 28%,rgba(0,0,0,.45) 62%,rgba(0,0,0,0) 100%);
+}
+.bottom-visualizer.off{opacity:0}
 
 /* ── Progress / toast ── */
 .toast{
@@ -432,6 +472,12 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
     <label>Default Reverb Decay (s)</label>
     <input type="number" id="defaultDecay" value="3" min="1" max="8" step="0.5">
   </div>
+  <div class="setting-group">
+    <label class="setting-toggle">
+      <span>Bottom Visualizer</span>
+      <input type="checkbox" id="bottomVisualizerToggle" checked>
+    </label>
+  </div>
 </div>
 
 <!-- Download modal -->
@@ -452,6 +498,7 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
+<canvas id="bottomVisualizer" class="bottom-visualizer" aria-hidden="true"></canvas>
 
 <!-- lamejs (MP3 encoder) -->
 <script>
@@ -794,6 +841,9 @@ const state = {
   waveformData: null,
   animFrame: null,
   serverOnline: false,
+  visualizerEnabled: true,
+  visualizerFreqData: null,
+  visualizerBarData: null,
 };
 
 const settings = {
@@ -801,6 +851,7 @@ const settings = {
   defaultReverb: 40,
   defaultDecay: 3,
   loopEnabled: false,
+  visualizerEnabled: true,
 };
 
 const SETTINGS_STORAGE_KEY = 'slowedReverbStudio.settings.v1';
@@ -830,6 +881,7 @@ function loadSettings() {
     if (Number.isFinite(parsed.defaultReverb)) settings.defaultReverb = parsed.defaultReverb;
     if (Number.isFinite(parsed.defaultDecay)) settings.defaultDecay = parsed.defaultDecay;
     if (typeof parsed.loopEnabled === 'boolean') settings.loopEnabled = parsed.loopEnabled;
+    if (typeof parsed.visualizerEnabled === 'boolean') settings.visualizerEnabled = parsed.visualizerEnabled;
   } catch (err) {
     console.warn('Failed to load settings from localStorage', err);
   }
@@ -847,12 +899,14 @@ function syncSettingsUI() {
   document.getElementById('defaultSpeed').value = settings.defaultSpeed;
   document.getElementById('defaultReverb').value = settings.defaultReverb;
   document.getElementById('defaultDecay').value = settings.defaultDecay;
+  document.getElementById('bottomVisualizerToggle').checked = settings.visualizerEnabled;
 
   settings.defaultSpeed = clampSpeed(settings.defaultSpeed);
   state.speed = settings.defaultSpeed;
   state.reverbMix = settings.defaultReverb / 100;
   state.reverbDecay = settings.defaultDecay;
   state.loopEnabled = settings.loopEnabled;
+  state.visualizerEnabled = settings.visualizerEnabled;
 
   document.getElementById('speedSlider').value = Math.round(state.speed * 100);
   document.getElementById('speedVal').textContent = state.speed.toFixed(2) + '×';
@@ -862,6 +916,8 @@ function syncSettingsUI() {
   document.getElementById('decayVal').textContent = state.reverbDecay.toFixed(1) + 's';
   updateLoopBtn();
   document.getElementById('loopBtn').title = state.loopEnabled ? 'Loop On' : 'Loop Off';
+  updateBottomVisualizerVisibility();
+  drawBottomVisualizer(!state.playing);
 }
 
 loadSettings();
@@ -1098,6 +1154,7 @@ function createSource(ctx, offset) {
       state.pausedAt = 0;
       state.source = null;
       updatePlayBtn();
+      drawBottomVisualizer(true);
     }
   };
   state.source = src;
@@ -1124,6 +1181,7 @@ function pause() {
   try { state.source.stop(); } catch(e) {}
   try { state.source.disconnect(); } catch(e) {}
   state.source = null;
+  drawBottomVisualizer(true);
 }
 
 function currentPosition() {
@@ -1217,10 +1275,135 @@ function drawWaveform() {
   ctx2d.setTransform(1,0,0,1,0,0);
 }
 
+function updateBottomVisualizerVisibility() {
+  const canvas = document.getElementById('bottomVisualizer');
+  canvas.classList.toggle('off', !state.visualizerEnabled);
+}
+
+function drawBottomVisualizer(clearOnly = false) {
+  const canvas = document.getElementById('bottomVisualizer');
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth;
+  const H = canvas.offsetHeight;
+  if (canvas.width !== W * dpr || canvas.height !== H * dpr) {
+    canvas.width = W * dpr;
+    canvas.height = H * dpr;
+  }
+
+  const ctx2d = canvas.getContext('2d');
+  ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx2d.clearRect(0, 0, W, H);
+
+  if (clearOnly || !state.visualizerEnabled || !state.playing || !state.analyser) {
+    ctx2d.setTransform(1, 0, 0, 1, 0, 0);
+    return;
+  }
+
+  const analyser = state.analyser;
+  const binCount = analyser.frequencyBinCount;
+  if (!state.visualizerFreqData || state.visualizerFreqData.length !== binCount) {
+    state.visualizerFreqData = new Uint8Array(binCount);
+  }
+  analyser.getByteFrequencyData(state.visualizerFreqData);
+  const now = Date.now() * 0.001;
+
+  const pointCount = Math.max(22, Math.floor(W / 26));
+  if (!state.visualizerBarData || state.visualizerBarData.length !== pointCount) {
+    state.visualizerBarData = new Float32Array(pointCount);
+  }
+
+  function getEnergy(startPct, endPct) {
+    const start = Math.max(0, Math.floor(binCount * startPct));
+    const end = Math.max(start + 1, Math.floor(binCount * endPct));
+    let sum = 0;
+    for (let i = start; i < end; i++) sum += state.visualizerFreqData[i] || 0;
+    return (sum / (end - start)) / 255;
+  }
+
+  const bass = getEnergy(0.00, 0.08);
+  const lowMid = getEnergy(0.08, 0.22);
+  const high = getEnergy(0.22, 0.55);
+  const pulse = Math.min(1, bass * 0.55 + lowMid * 0.3 + high * 0.15);
+
+  const haze = ctx2d.createLinearGradient(0, H, 0, 0);
+  haze.addColorStop(0, `rgba(124,58,237,${0.08 + pulse * 0.16})`);
+  haze.addColorStop(0.4, `rgba(167,139,250,${0.05 + pulse * 0.1})`);
+  haze.addColorStop(1, 'rgba(6,182,212,0)');
+  ctx2d.fillStyle = haze;
+  ctx2d.fillRect(0, 0, W, H);
+
+  const bloomLeft = ctx2d.createRadialGradient(W * 0.18, H * 0.9, 0, W * 0.18, H * 0.9, W * 0.42);
+  bloomLeft.addColorStop(0, `rgba(124,58,237,${0.14 + bass * 0.25})`);
+  bloomLeft.addColorStop(1, 'rgba(124,58,237,0)');
+  ctx2d.fillStyle = bloomLeft;
+  ctx2d.fillRect(0, 0, W, H);
+
+  const bloomRight = ctx2d.createRadialGradient(W * 0.84, H * 0.88, 0, W * 0.84, H * 0.88, W * 0.44);
+  bloomRight.addColorStop(0, `rgba(6,182,212,${0.12 + high * 0.22})`);
+  bloomRight.addColorStop(1, 'rgba(6,182,212,0)');
+  ctx2d.fillStyle = bloomRight;
+  ctx2d.fillRect(0, 0, W, H);
+
+  const step = Math.max(1, Math.floor(binCount / pointCount));
+  for (let i = 0; i < pointCount; i++) {
+    const start = i * step;
+    let sum = 0;
+    for (let j = 0; j < step; j++) sum += state.visualizerFreqData[start + j] || 0;
+    const raw = (sum / step) / 255;
+    state.visualizerBarData[i] = state.visualizerBarData[i] * 0.8 + raw * 0.2;
+  }
+
+  function drawWave(yBase, ampScale, colorA, colorB, alpha, lineW, speed, freq) {
+    const grad = ctx2d.createLinearGradient(0, H, W, 0);
+    grad.addColorStop(0, colorA);
+    grad.addColorStop(1, colorB);
+    ctx2d.strokeStyle = grad;
+    ctx2d.lineWidth = lineW;
+    ctx2d.lineCap = 'round';
+    ctx2d.lineJoin = 'round';
+    ctx2d.globalAlpha = alpha;
+    ctx2d.beginPath();
+    let firstY = yBase;
+    for (let i = 0; i < pointCount; i++) {
+      const t = i / (pointCount - 1);
+      const x = t * W;
+      const amp = Math.pow(state.visualizerBarData[i], 1.2) * (H * ampScale);
+      const drift = Math.sin(now * speed + t * freq) * (2 + bass * 6);
+      const y = yBase - amp - drift;
+      if (i === 0) {
+        firstY = y;
+        ctx2d.moveTo(x, y);
+      }
+      else {
+        const prevT = (i - 1) / (pointCount - 1);
+        const prevX = prevT * W;
+        const cx = (prevX + x) * 0.5;
+        const prevAmp = Math.pow(state.visualizerBarData[i - 1], 1.2) * (H * ampScale);
+        const prevDrift = Math.sin(now * speed + prevT * freq) * (2 + bass * 6);
+        const prevY = yBase - prevAmp - prevDrift;
+        ctx2d.quadraticCurveTo(prevX, prevY, cx, (prevY + y) * 0.5);
+      }
+    }
+    ctx2d.lineTo(W, firstY);
+    ctx2d.stroke();
+  }
+
+  ctx2d.shadowBlur = 24;
+  ctx2d.shadowColor = 'rgba(124,58,237,0.2)';
+  drawWave(H * 0.86, 0.22, 'rgba(124,58,237,0.6)', 'rgba(6,182,212,0.5)', 0.58, 18, 1.2, 8.8);
+  drawWave(H * 0.78, 0.2, 'rgba(167,139,250,0.55)', 'rgba(34,211,238,0.48)', 0.48, 14, 1.55, 10.2);
+  ctx2d.shadowBlur = 0;
+  drawWave(H * 0.71, 0.16, 'rgba(196,181,253,0.42)', 'rgba(103,232,249,0.35)', 0.34, 10, 1.8, 11.4);
+
+  ctx2d.globalAlpha = 1;
+  ctx2d.setTransform(1,0,0,1,0,0);
+}
+
 function startAnimLoop() {
   if (state.animFrame) cancelAnimationFrame(state.animFrame);
   function loop() {
     drawWaveform();
+    drawBottomVisualizer();
     updateTimeDisplay();
     if (state.playing) {
       state.animFrame = requestAnimationFrame(loop);
@@ -1305,7 +1488,12 @@ function showPlayerUI(show) {
     document.getElementById(id).classList.toggle('hidden', !show);
   });
   document.getElementById('newSongBtn').classList.toggle('hidden', !show);
-  if (show) drawWaveform();
+  if (show) {
+    drawWaveform();
+    drawBottomVisualizer(!state.playing);
+  } else {
+    drawBottomVisualizer(true);
+  }
 }
 
 function showLoading(on) {
@@ -1332,6 +1520,8 @@ function resetStudio() {
 
   state.audioBuffer = null;
   state.waveformData = null;
+  state.visualizerFreqData = null;
+  state.visualizerBarData = null;
   state.duration = 0;
   state.pausedAt = 0;
   state.playing = false;
@@ -1348,6 +1538,7 @@ function resetStudio() {
   showPlayerUI(false);
   updatePlayBtn();
   updateSourceImportUI();
+  drawBottomVisualizer(true);
 }
 
 // ─── Effect Sliders ──────────────────────────────────────────────────────────
@@ -1428,6 +1619,7 @@ document.getElementById('endBtn').addEventListener('click', () => {
     updatePlayBtn();
   }
   drawWaveform();
+  drawBottomVisualizer(true);
   updateTimeDisplay();
 });
 
@@ -1840,9 +2032,19 @@ document.getElementById('defaultDecay').addEventListener('change', e => {
     document.getElementById('decayVal').textContent = settings.defaultDecay.toFixed(1) + 's';
   }
 });
+document.getElementById('bottomVisualizerToggle').addEventListener('change', e => {
+  settings.visualizerEnabled = e.target.checked;
+  state.visualizerEnabled = settings.visualizerEnabled;
+  saveSettings();
+  updateBottomVisualizerVisibility();
+  drawBottomVisualizer(!state.playing);
+});
 
 // ─── Resize waveform on window resize ────────────────────────────────────────
-window.addEventListener('resize', () => { if (state.waveformData) drawWaveform(); });
+window.addEventListener('resize', () => {
+  if (state.waveformData) drawWaveform();
+  drawBottomVisualizer(!state.playing);
+});
 
 // ─── Keyboard shortcuts ──────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
