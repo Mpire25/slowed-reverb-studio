@@ -57,8 +57,4 @@
 
   <!-- Center baseline -->
   <line x1="30" y1="200" x2="370" y2="200" stroke="white" stroke-opacity="0.06" stroke-width="1"/>
-
-  <!-- Label -->
-  <text x="200" y="360" text-anchor="middle" font-family="'SF Pro Display', 'Helvetica Neue', sans-serif"
-        font-size="13" font-weight="600" letter-spacing="4" fill="white" opacity="0.5">SLOWED + REVERB</text>
 </svg>
