@@ -1338,7 +1338,15 @@ function rebuildPlayback() {
 }
 
 document.getElementById('speedSlider').addEventListener('input', e => {
-  state.speed = e.target.value / 100;
+  const nextSpeed = e.target.value / 100;
+  if (state.playing && state.audioCtx) {
+    const pos = currentPosition();
+    state.speed = nextSpeed;
+    // Keep timeline position stable when changing playback speed mid-track.
+    state.startTime = state.audioCtx.currentTime - pos / state.speed;
+  } else {
+    state.speed = nextSpeed;
+  }
   document.getElementById('speedVal').textContent = state.speed.toFixed(2) + '×';
   if (state.source) state.source.playbackRate.value = state.speed;
 });
