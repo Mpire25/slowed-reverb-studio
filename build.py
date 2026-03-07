@@ -103,8 +103,15 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 .track-card{padding:20px;display:flex;gap:18px;align-items:flex-start;margin-bottom:20px}
 .album-art{width:80px;height:80px;border-radius:10px;object-fit:cover;flex-shrink:0;
   background:linear-gradient(135deg,rgba(124,58,237,.3),rgba(6,182,212,.3));
-  display:flex;align-items:center;justify-content:center;font-size:1.8rem;overflow:hidden}
-.album-art img{width:100%;height:100%;object-fit:cover}
+  display:flex;align-items:center;justify-content:center;font-size:1.8rem;overflow:hidden;position:relative}
+.album-art-placeholder{
+  width:100%;height:100%;display:flex;align-items:center;justify-content:center;line-height:1;
+}
+.album-art-img{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  opacity:0;transition:opacity .28s ease;
+}
+.album-art-img.loaded{opacity:1}
 .track-info{flex:1;min-width:0}
 .track-title{font-size:1.05rem;font-weight:600;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:text;outline:none;border-radius:4px;padding:1px 3px;margin-left:-3px;transition:background .15s}
 .track-title:focus{background:rgba(255,255,255,.07);white-space:normal;overflow:visible;text-overflow:clip}
@@ -908,10 +915,24 @@ function updateTrackUI() {
   document.getElementById('trackDuration').textContent = fmt(state.duration);
 
   const artEl = document.getElementById('albumArt');
+  artEl.innerHTML = '';
+  const placeholderEl = document.createElement('span');
+  placeholderEl.className = 'album-art-placeholder';
+  placeholderEl.setAttribute('aria-hidden', 'true');
+  placeholderEl.textContent = '🎵';
+  artEl.appendChild(placeholderEl);
+
   if (state.artBlob) {
-    artEl.innerHTML = `<img src="${state.artBlob}" alt="Album art">`;
-  } else {
-    artEl.innerHTML = '🎵';
+    const img = new Image();
+    img.className = 'album-art-img';
+    img.alt = 'Album art';
+    img.decoding = 'async';
+    img.addEventListener('load', () => img.classList.add('loaded'), { once: true });
+    img.src = state.artBlob;
+    artEl.appendChild(img);
+    if (img.complete) {
+      requestAnimationFrame(() => img.classList.add('loaded'));
+    }
   }
 }
 
