@@ -9,7 +9,7 @@ import queue
 import threading
 from pathlib import Path
 
-from flask import Flask, Response, jsonify, request, send_file, stream_with_context
+from flask import Flask, Response, jsonify, request, send_file, send_from_directory, stream_with_context
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -17,6 +17,7 @@ CORS(app)
 
 STUDIO_DIR = Path(__file__).parent
 DOWNLOADS_DIR = STUDIO_DIR / "downloads"
+STATIC_DIR = STUDIO_DIR / "static"
 
 
 def _sse(event_type, data):
@@ -146,7 +147,17 @@ def serve_file():
     )
 
 
+@app.route("/")
+def index():
+    return send_from_directory(str(STATIC_DIR), "index.html")
+
+
+@app.route("/<path:filename>")
+def static_files(filename):
+    return send_from_directory(str(STATIC_DIR), filename)
+
+
 if __name__ == "__main__":
     print("Slowed & Reverb Studio — server")
-    print("Listening on http://localhost:7337")
+    print("Open http://localhost:7337 in your browser")
     app.run(host="127.0.0.1", port=7337, debug=False, threaded=True)

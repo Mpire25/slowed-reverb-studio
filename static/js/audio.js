@@ -1,0 +1,167 @@
+import { state } from './state.js';
+import {
+  beginBottomVisualizerFade,
+  clearBottomVisualizerFade,
+  updateBottomVisualizerPlaybackState,
+  startAnimLoop,
+} from './visualizer.js';
+
+export function getCtx() {
+  if (!state.audioCtx) {
+    state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return state.audioCtx;
+}
+
+export function makeIR(ctx, decay) {
+  const sampleRate = ctx.sampleRate;
+  const len = Math.ceil(sampleRate * decay);
+  const ir = ctx.createBuffer(2, len, sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = ir.getChannelData(ch);
+    for (let i = 0; i < len; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 1.5 + decay * 0.1);
+    }
+  }
+  return ir;
+}
+
+export function buildPipeline(ctx) {
+  if (state.source) { try { state.source.disconnect(); } catch(e) {} }
+  if (state.convolver) { try { state.convolver.disconnect(); } catch(e) {} }
+  if (state.dryGain) { try { state.dryGain.disconnect(); } catch(e) {} }
+  if (state.wetGain) { try { state.wetGain.disconnect(); } catch(e) {} }
+  if (state.merger) { try { state.merger.disconnect(); } catch(e) {} }
+  if (state.analyser) { try { state.analyser.disconnect(); } catch(e) {} }
+
+  const analyser = ctx.createAnalyser();
+  analyser.fftSize = 2048;
+  const dryGain = ctx.createGain();
+  const wetGain = ctx.createGain();
+  const convolver = ctx.createConvolver();
+
+  dryGain.gain.value = 1 - state.reverbMix;
+  wetGain.gain.value = state.reverbMix;
+  convolver.buffer = makeIR(ctx, state.reverbDecay);
+
+  dryGain.connect(analyser);
+  convolver.connect(wetGain);
+  wetGain.connect(analyser);
+  analyser.connect(ctx.destination);
+
+  state.analyser = analyser;
+  state.dryGain = dryGain;
+  state.wetGain = wetGain;
+  state.convolver = convolver;
+}
+
+function createSource(ctx, offset) {
+  if (state.source) {
+    try {
+      state.source.onended = null;
+      state.source.stop();
+      state.source.disconnect();
+    } catch(e) {}
+  }
+  const src = ctx.createBufferSource();
+  src.buffer = state.audioBuffer;
+  src.playbackRate.value = state.speed;
+  src.loop = state.loopEnabled;
+  src.connect(state.dryGain);
+  src.connect(state.convolver);
+  src.onended = () => {
+    if (state.source !== src) return;
+    if (state.playing) {
+      state.playing = false;
+      state.pausedAt = 0;
+      state.source = null;
+      beginBottomVisualizerFade();
+      updatePlayBtn();
+      updateBottomVisualizerPlaybackState();
+    }
+  };
+  state.source = src;
+  src.start(0, offset);
+  state.startTime = ctx.currentTime - offset / state.speed;
+  state.playing = true;
+  updateBottomVisualizerPlaybackState();
+}
+
+export function currentPosition() {
+  if (!state.playing || !state.audioCtx) return state.pausedAt;
+  if (!state.duration) return 0;
+  const elapsed = (state.audioCtx.currentTime - state.startTime) * state.speed;
+  if (state.loopEnabled) return elapsed % state.duration;
+  return Math.min(elapsed, state.duration);
+}
+
+export function play() {
+  const ctx = getCtx();
+  if (ctx.state === 'suspended') ctx.resume();
+  clearBottomVisualizerFade();
+  buildPipeline(ctx);
+  createSource(ctx, state.pausedAt);
+  updatePlayBtn();
+  startAnimLoop();
+}
+
+export function pause() {
+  if (!state.source) return;
+  state.pausedAt = currentPosition();
+  state.playing = false;
+  beginBottomVisualizerFade();
+  updatePlayBtn();
+  try { state.source.stop(); } catch(e) {}
+  try { state.source.disconnect(); } catch(e) {}
+  state.source = null;
+  updateBottomVisualizerPlaybackState();
+}
+
+export function seekTo(fraction) {
+  const offset = fraction * state.duration;
+  state.pausedAt = offset;
+  if (state.playing) {
+    const ctx = getCtx();
+    buildPipeline(ctx);
+    createSource(ctx, offset);
+  }
+}
+
+export function applyEffects() {
+  if (!state.playing || !state.dryGain) return;
+  state.dryGain.gain.value = 1 - state.reverbMix;
+  state.wetGain.gain.value = state.reverbMix;
+}
+
+export function rebuildPlayback() {
+  if (!state.audioBuffer) return;
+  if (state.playing) {
+    const offset = currentPosition();
+    state.pausedAt = offset;
+    const ctx = getCtx();
+    buildPipeline(ctx);
+    createSource(ctx, offset);
+  }
+}
+
+export function updatePlayBtn() {
+  const icon = document.getElementById('playIcon');
+  if (state.playing) {
+    icon.innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
+  } else {
+    icon.innerHTML = '<polygon points="5,3 19,12 5,21"/>';
+  }
+}
+
+export function updateLoopBtn() {
+  const btn = document.getElementById('loopBtn');
+  btn.classList.toggle('active', state.loopEnabled);
+  btn.setAttribute('aria-pressed', state.loopEnabled ? 'true' : 'false');
+}
+
+export async function loadAudioBuffer(arrayBuffer) {
+  const ctx = getCtx();
+  if (ctx.state === 'suspended') ctx.resume();
+  const buf = await ctx.decodeAudioData(arrayBuffer.slice(0));
+  return buf;
+}

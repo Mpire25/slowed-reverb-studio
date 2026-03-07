@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Slowed &amp; Reverb Studio</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header>
+    <div class="logo">Slowed &amp; Reverb Studio</div>
+    <div class="header-right">
+      <div class="server-status" id="serverStatus" style="display:none">
+        <span class="status-dot"></span>
+        <span id="statusLabel"></span>
+      </div>
+      <button class="gear-btn" id="gearBtn" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+</header>
+
+<div class="app">
+
+  <!-- Drop zone -->
+  <div class="drop-zone" id="dropZone">
+    <div class="icon">🎵</div>
+    <p><strong>Drop an MP3 here</strong><br>or click to browse</p>
+    <input type="file" id="fileInput" accept=".mp3,audio/*" aria-label="Choose audio file">
+  </div>
+
+  <!-- URL import -->
+  <div class="url-section" id="urlRow" style="display:none">
+    <div class="url-divider"><span>or import from YouTube / Spotify</span></div>
+    <div class="url-row">
+      <input type="text" id="urlInput" placeholder="Paste a YouTube or Spotify URL…" autocomplete="off">
+      <button id="urlLoadBtn" disabled>Load</button>
+    </div>
+    <!-- Live import status -->
+    <div class="import-status" id="importStatus" style="display:none">
+      <div class="import-meta">
+        <div class="import-art" id="importArt">🎵</div>
+        <div class="import-info">
+          <div class="import-title" id="importTitle">Loading…</div>
+          <div class="import-artist" id="importArtist"></div>
+        </div>
+      </div>
+      <div class="import-stage" id="importStage"></div>
+      <div class="import-track-progress" id="importTrackProgress" style="display:none"></div>
+      <div class="import-bar-wrap"><div class="import-bar" id="importBar"></div></div>
+      <div class="import-tracks" id="importTrackList" style="display:none"></div>
+    </div>
+  </div>
+  <!-- Track card -->
+  <div class="card track-card hidden" id="trackCard">
+    <div class="album-art" id="albumArt">🎵</div>
+    <div class="track-info">
+      <div class="track-title" id="trackTitle" contenteditable="true" spellcheck="false">Unknown Title</div>
+      <div class="track-artist" id="trackArtist">Unknown Artist</div>
+      <div class="track-meta-row">
+        <div class="track-duration" id="trackDuration">0:00</div>
+        <div class="track-source-links" aria-label="Source links">
+          <a class="track-source-link hidden" id="trackSpotifyLink" href="#" target="_blank" rel="noopener noreferrer" title="Open on Spotify" aria-label="Open on Spotify">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 1.5A10.5 10.5 0 1 0 22.5 12 10.5 10.5 0 0 0 12 1.5Zm4.85 15.15a.9.9 0 0 1-1.24.3 9.55 9.55 0 0 0-7.97-.98.9.9 0 1 1-.56-1.71 11.34 11.34 0 0 1 9.47 1.17.9.9 0 0 1 .3 1.22Zm1.28-2.83a1.12 1.12 0 0 1-1.54.37 11.84 11.84 0 0 0-9.87-1.22 1.12 1.12 0 1 1-.67-2.14 14.07 14.07 0 0 1 11.72 1.45 1.12 1.12 0 0 1 .36 1.54Zm.15-3.04A14.2 14.2 0 0 0 6.41 9.25a1.35 1.35 0 0 1-.8-2.58 16.89 16.89 0 0 1 14.11 1.79 1.35 1.35 0 1 1-1.44 2.32Z"/>
+            </svg>
+          </a>
+          <a class="track-source-link hidden" id="trackYouTubeLink" href="#" target="_blank" rel="noopener noreferrer" title="Open on YouTube" aria-label="Open on YouTube">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M21.58 7.19a2.96 2.96 0 0 0-2.08-2.1C17.66 4.5 12 4.5 12 4.5s-5.66 0-7.5.59a2.96 2.96 0 0 0-2.08 2.1A30.8 30.8 0 0 0 1.9 12a30.8 30.8 0 0 0 .52 4.81 2.96 2.96 0 0 0 2.08 2.1c1.84.59 7.5.59 7.5.59s5.66 0 7.5-.59a2.96 2.96 0 0 0 2.08-2.1A30.8 30.8 0 0 0 22.1 12a30.8 30.8 0 0 0-.52-4.81ZM10.2 15.08V8.92L15.6 12Z"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Waveform -->
+  <div class="card waveform-wrap hidden" id="waveformWrap">
+    <canvas id="waveform"></canvas>
+  </div>
+
+  <!-- Transport -->
+  <div class="transport hidden" id="transport">
+    <button class="transport-icon-btn" id="startBtn" title="Start" aria-label="Start">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <rect x="4.5" y="4" width="2.5" height="16" rx="1"/>
+        <polygon points="18,5 8.5,12 18,19"/>
+      </svg>
+    </button>
+    <button class="play-btn" id="playBtn" aria-label="Play/Pause">
+      <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+    </button>
+    <button class="transport-icon-btn" id="endBtn" title="End" aria-label="End">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <polygon points="6,5 15.5,12 6,19"/>
+        <rect x="17" y="4" width="2.5" height="16" rx="1"/>
+      </svg>
+    </button>
+    <button class="transport-icon-btn loop-btn" id="loopBtn" title="Loop Off" aria-label="Toggle Loop" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 7h9l-2.5-2.5M16 17H7l2.5 2.5M17 7c2 0 3 1 3 3v1M7 17c-2 0-3-1-3-3v-1"/>
+      </svg>
+    </button>
+    <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
+  </div>
+
+  <!-- Effects -->
+  <div class="card effects hidden" id="effects" style="padding:20px">
+    <h3>Effects</h3>
+    <div class="slider-group">
+      <div class="slider-row">
+        <span class="slider-label">Speed</span>
+        <div class="slider-input-wrap speed-slider-wrap">
+          <input type="range" id="speedSlider" min="50" max="150" value="75" step="1" aria-label="Speed">
+          <span class="speed-divider" aria-hidden="true"></span>
+        </div>
+        <span class="slider-value" id="speedVal">0.75×</span>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">Reverb Mix</span>
+        <input type="range" id="reverbSlider" min="0" max="100" value="40" step="1" aria-label="Reverb Mix">
+        <span class="slider-value" id="reverbVal">40%</span>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">Reverb Decay</span>
+        <input type="range" id="decaySlider" min="10" max="80" value="30" step="1" aria-label="Reverb Decay">
+        <span class="slider-value" id="decayVal">3.0s</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Download -->
+  <button class="download-btn hidden" id="downloadBtn">Download MP3</button>
+  <button class="new-song-btn hidden" id="newSongBtn" type="button"><span class="plus">+</span> New Song</button>
+</div>
+
+<!-- Settings panel -->
+<div class="overlay" id="overlay"></div>
+<div class="settings-panel" id="settingsPanel">
+  <button class="close-btn" id="closeSettings">×</button>
+  <h2>Settings</h2>
+  <div class="setting-group">
+    <label>Default Speed (×)</label>
+    <input type="number" id="defaultSpeed" value="0.75" min="0.5" max="1.5" step="0.05">
+  </div>
+  <div class="setting-group">
+    <label>Default Reverb Mix (%)</label>
+    <input type="number" id="defaultReverb" value="40" min="0" max="100" step="5">
+  </div>
+  <div class="setting-group">
+    <label>Default Reverb Decay (s)</label>
+    <input type="number" id="defaultDecay" value="3" min="1" max="8" step="0.5">
+  </div>
+  <div class="setting-group">
+    <label class="setting-toggle">
+      <span>Bottom Visualizer</span>
+      <span class="apple-switch">
+        <input type="checkbox" id="bottomVisualizerToggle" checked>
+        <span class="apple-switch-track">
+          <span class="apple-switch-thumb"></span>
+        </span>
+      </span>
+    </label>
+  </div>
+  <div class="setting-group">
+    <label class="setting-toggle">
+      <span>Album Art Theme</span>
+      <span class="apple-switch">
+        <input type="checkbox" id="artThemeToggle">
+        <span class="apple-switch-track">
+          <span class="apple-switch-thumb"></span>
+        </span>
+      </span>
+    </label>
+  </div>
+</div>
+
+<!-- Download modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h3>Export MP3</h3>
+    <label>Filename</label>
+    <input type="text" id="filenameInput" autocomplete="off">
+    <div class="modal-btns">
+      <button class="modal-cancel" id="modalCancel">Cancel</button>
+      <button class="modal-confirm" id="modalConfirm">Export</button>
+    </div>
+    <div class="progress-wrap" id="progressWrap" style="display:none">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+<canvas id="bottomVisualizer" class="bottom-visualizer" aria-hidden="true"></canvas>
+
+<script src="/lib/lame.min.js"></script>
+<script type="module" src="/js/ui.js"></script>
+</body>
+</html>
