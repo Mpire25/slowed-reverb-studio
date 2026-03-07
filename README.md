@@ -22,16 +22,11 @@ The gear icon (top right) opens settings to change the filename suffix and defau
 
 ## YouTube & Spotify Import (requires Flask server)
 
-### 1. Clone with submodules
+### 1. Clone
 
 ```bash
-git clone --recurse-submodules https://github.com/Mpire25/slowed-reverb-studio
+git clone https://github.com/Mpire25/slowed-reverb-studio
 cd slowed-reverb-studio
-```
-
-If you already cloned without `--recurse-submodules`:
-```bash
-git submodule update --init --recurse
 ```
 
 ### 2. Install Python dependencies
@@ -76,9 +71,6 @@ slowed-reverb-studio/
   studio_downloader.py  — integrated download engine (YouTube + Spotify)
   requirements.txt
   downloads/            — imported MP3s saved here
-  downloaders/
-    spotify-to-mp3/     — git submodule (standalone CLI tool, independent)
-    youtube-to-mp3/     — git submodule (standalone CLI tool, independent)
 ```
 
 ### Live download status (SSE)
@@ -97,15 +89,7 @@ When you paste a URL and click Load, the frontend opens a Server-Sent Events str
 | `complete` | Final file path(s) — triggers load into studio |
 | `error` | Fatal error message |
 
-The `downloaders/` submodules are independent CLI tools — they are **not** used by the studio server. The studio has its own `studio_downloader.py` with callback-based progress rather than terminal output.
-
-### Updating the downloader submodules
-
-```bash
-git submodule update --remote downloaders/spotify-to-mp3
-git submodule update --remote downloaders/youtube-to-mp3
-git add downloaders/ && git commit -m "Update downloader submodules"
-```
+The studio has its own `studio_downloader.py` with callback-based progress rather than terminal output. If you want the standalone CLI tools separately, they live at [spotify-to-mp3](https://github.com/Mpire25/spotify-to-mp3) and [youtube-to-mp3](https://github.com/Mpire25/youtube-to-mp3).
 
 ---
 
