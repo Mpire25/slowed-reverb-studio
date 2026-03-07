@@ -762,8 +762,8 @@ async function loadFile(arrayBuffer, filename) {
     state.artist = tags['TPE1'] || 'Unknown Artist';
 
     if (tags['APIC']) {
-      const { bytes, mime, raw } = tags['APIC'];
-      state.artBytes = raw;
+      const { bytes, mime } = tags['APIC'];
+      state.artBytes = new Uint8Array(bytes);
       state.artMime = mime;
       if (state.artBlob) URL.revokeObjectURL(state.artBlob);
       state.artBlob = URL.createObjectURL(new Blob([bytes], { type: mime }));
@@ -1087,7 +1087,9 @@ async function doExport(filename) {
 
     // Build ID3 tag
     const title = document.getElementById('trackTitle').textContent.trim() || state.title;
-    const artBytes = state.artBytes ? new Uint8Array(state.artBytes.buffer || state.artBytes) : null;
+    const artBytes = state.artBytes
+      ? (state.artBytes instanceof Uint8Array ? new Uint8Array(state.artBytes) : new Uint8Array(state.artBytes))
+      : null;
     const id3Tag = buildID3Tag(title + settings.suffix, state.artist, artBytes, state.artMime);
 
     // Assemble: ID3 + MP3 bytes
