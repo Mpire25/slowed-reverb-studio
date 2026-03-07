@@ -15,9 +15,9 @@ export const state = {
   startTime: 0,       // audioCtx.currentTime when playback started
   pausedAt: 0,        // seconds into track when paused
   playing: false,
-  speed: 0.75,
-  reverbMix: 0.40,
-  reverbDecay: 3.0,
+  speed: 0.9,
+  reverbMix: 0.30,
+  reverbDecay: 2.0,
   loopEnabled: false,
   title: 'Unknown Title',
   artist: 'Unknown Artist',
@@ -45,12 +45,12 @@ export const state = {
 };
 
 export const settings = {
-  defaultSpeed: 0.75,
-  defaultReverb: 40,
-  defaultDecay: 3,
+  defaultSpeed: 0.9,
+  defaultReverb: 30,
+  defaultDecay: 2,
   loopEnabled: false,
   visualizerEnabled: true,
-  artThemeEnabled: false,
+  artThemeEnabled: true,
 };
 
 export const SETTINGS_STORAGE_KEY = 'slowedReverbStudio.settings.v1';
