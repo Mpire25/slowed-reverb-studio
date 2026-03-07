@@ -130,14 +130,14 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 .play-btn:hover{transform:scale(1.06);box-shadow:0 6px 28px rgba(124,58,237,.5)}
 .play-btn:active{transform:scale(.96)}
 .play-btn svg{width:20px;height:20px}
-.restart-btn{
-  width:36px;height:36px;border-radius:50%;border:1px solid var(--border);
-  background:var(--card);color:var(--muted);cursor:pointer;
+.transport-icon-btn{
+  padding:6px;border:none;background:transparent;color:var(--muted);cursor:pointer;
   display:flex;align-items:center;justify-content:center;
-  transition:color .2s,background .2s;flex-shrink:0;
+  transition:color .2s;flex-shrink:0;
 }
-.restart-btn:hover{color:var(--text);background:rgba(255,255,255,.08)}
-.restart-btn svg{width:16px;height:16px}
+.transport-icon-btn:hover{color:var(--text)}
+.transport-icon-btn svg{width:18px;height:18px}
+.loop-btn.active{color:var(--text)}
 .time-display{font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 
 /* ── Effects ── */
@@ -276,13 +276,25 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
 
   <!-- Transport -->
   <div class="transport hidden" id="transport">
-    <button class="restart-btn" id="restartBtn" title="Restart" aria-label="Restart">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/>
+    <button class="transport-icon-btn" id="startBtn" title="Start" aria-label="Start">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <rect x="4.5" y="4" width="2.5" height="16" rx="1"/>
+        <polygon points="18,5 8.5,12 18,19"/>
       </svg>
     </button>
     <button class="play-btn" id="playBtn" aria-label="Play/Pause">
       <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+    </button>
+    <button class="transport-icon-btn" id="endBtn" title="End" aria-label="End">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <polygon points="6,5 15.5,12 6,19"/>
+        <rect x="17" y="4" width="2.5" height="16" rx="1"/>
+      </svg>
+    </button>
+    <button class="transport-icon-btn loop-btn" id="loopBtn" title="Loop Off" aria-label="Toggle Loop" aria-pressed="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 7h9l-2.5-2.5M16 17H7l2.5 2.5M17 7c2 0 3 1 3 3v1M7 17c-2 0-3-1-3-3v-1"/>
+      </svg>
     </button>
     <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
   </div>
@@ -379,6 +391,7 @@ const state = {
   speed: 0.75,
   reverbMix: 0.40,
   reverbDecay: 3.0,
+  loopEnabled: false,
   title: 'Unknown Title',
   artist: 'Unknown Artist',
   artBlob: null,      // Blob URL for album art
@@ -657,6 +670,7 @@ function createSource(ctx, offset) {
   const src = ctx.createBufferSource();
   src.buffer = state.audioBuffer;
   src.playbackRate.value = state.speed;
+  src.loop = state.loopEnabled;
   src.connect(state.dryGain);
   src.connect(state.convolver);
   src.onended = () => {
@@ -713,6 +727,12 @@ function updatePlayBtn() {
   } else {
     icon.innerHTML = '<polygon points="5,3 19,12 5,21"/>';
   }
+}
+
+function updateLoopBtn() {
+  const btn = document.getElementById('loopBtn');
+  btn.classList.toggle('active', state.loopEnabled);
+  btn.setAttribute('aria-pressed', state.loopEnabled ? 'true' : 'false');
 }
 
 // ─── Waveform ────────────────────────────────────────────────────────────────
@@ -913,7 +933,7 @@ document.getElementById('playBtn').addEventListener('click', () => {
   else play();
 });
 
-document.getElementById('restartBtn').addEventListener('click', () => {
+document.getElementById('startBtn').addEventListener('click', () => {
   if (!state.audioBuffer) return;
   state.pausedAt = 0;
   if (state.playing) {
@@ -923,6 +943,26 @@ document.getElementById('restartBtn').addEventListener('click', () => {
   }
   drawWaveform();
   updateTimeDisplay();
+});
+
+document.getElementById('endBtn').addEventListener('click', () => {
+  if (!state.audioBuffer) return;
+  state.pausedAt = state.duration;
+  if (state.source) {
+    state.playing = false;
+    try { state.source.stop(); state.source.disconnect(); } catch(e) {}
+    state.source = null;
+    updatePlayBtn();
+  }
+  drawWaveform();
+  updateTimeDisplay();
+});
+
+document.getElementById('loopBtn').addEventListener('click', () => {
+  state.loopEnabled = !state.loopEnabled;
+  if (state.source) state.source.loop = state.loopEnabled;
+  updateLoopBtn();
+  document.getElementById('loopBtn').title = state.loopEnabled ? 'Loop On' : 'Loop Off';
 });
 
 // ─── Waveform scrubbing ──────────────────────────────────────────────────────
