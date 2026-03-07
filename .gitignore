@@ -40,3 +40,5 @@ htmlcov/
 
 # Downloads
 downloads/
+
+.vite/
