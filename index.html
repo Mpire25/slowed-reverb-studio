@@ -100,6 +100,13 @@ header{display:flex;align-items:center;justify-content:space-between;max-width:1
 .url-row button:hover{opacity:.9}
 .url-row button:active{transform:scale(.97)}
 .url-row button:disabled{opacity:.4;cursor:not-allowed}
+.new-song-btn{
+  margin-bottom:16px;padding:9px 14px;border-radius:10px;border:1px solid var(--border);
+  background:rgba(255,255,255,.06);color:var(--text);cursor:pointer;font-size:.84rem;font-weight:600;
+  transition:background .2s,border-color .2s;
+}
+.new-song-btn:hover{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.18)}
+.new-song-btn.hidden{display:none}
 @keyframes pulse-dot{0%,100%{box-shadow:0 0 0 0 rgba(52,211,153,.5)}70%{box-shadow:0 0 0 5px rgba(52,211,153,0)}}
 .server-status{display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--muted);white-space:nowrap}
 .status-dot{width:7px;height:7px;border-radius:50%;background:#ef4444;flex-shrink:0}
