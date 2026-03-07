@@ -109,3 +109,11 @@ The studio has its own `studio_downloader.py` with callback-based progress rathe
 - Speed change intentionally shifts pitch (no pitch correction) — this is the slowed & reverb sound
 - YouTube downloads use yt-dlp with Android/web player clients to avoid 403s
 - Spotify uses the Client Credentials API flow — no user login required
+
+### Rebuilding `index.html`
+
+If you update the UI source in `build.py`, regenerate `index.html` with:
+
+```bash
+python build.py
+```
