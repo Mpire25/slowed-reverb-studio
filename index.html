@@ -28,7 +28,7 @@ body{
 .app{max-width:680px;margin:0 auto;padding:24px 20px 60px}
 
 /* ── Header ── */
-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px}
+header{display:flex;align-items:center;justify-content:space-between;max-width:1400px;margin:0 auto 32px;padding:20px 40px;width:100%}
 .logo{font-size:1.2rem;font-weight:700;letter-spacing:-0.02em;
   background:linear-gradient(90deg,#a78bfa,var(--accent2));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
@@ -63,7 +63,11 @@ header{display:flex;align-items:center;justify-content:space-between;margin-bott
 .drop-zone strong{color:var(--text)}
 .drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
 
-.url-row{display:flex;gap:8px;margin-top:16px}
+.url-section{margin-top:12px}
+.url-divider{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.url-divider::before,.url-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.url-divider span{color:var(--muted);font-size:.8rem;white-space:nowrap}
+.url-row{display:flex;gap:8px}
 .url-row input{
   flex:1;background:rgba(255,255,255,0.06);border:1px solid var(--border);
   border-radius:10px;padding:9px 14px;color:var(--text);font-size:.875rem;outline:none;
@@ -222,8 +226,7 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
 </head>
 <body>
 
-<div class="app">
-  <header>
+<header>
     <div class="logo">Slowed &amp; Reverb Studio</div>
     <div class="header-right">
       <div class="server-status" id="serverStatus" style="display:none">
@@ -238,14 +241,20 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
     </div>
   </header>
 
+<div class="app">
+
   <!-- Drop zone -->
   <div class="drop-zone" id="dropZone">
     <div class="icon">🎵</div>
     <p><strong>Drop an MP3 here</strong><br>or click to browse</p>
     <input type="file" id="fileInput" accept=".mp3,audio/*" aria-label="Choose audio file">
+  </div>
 
-    <div class="url-row" id="urlRow" style="display:none">
-      <input type="text" id="urlInput" placeholder="Spotify or YouTube URL…" autocomplete="off">
+  <!-- URL import -->
+  <div class="url-section" id="urlRow" style="display:none">
+    <div class="url-divider"><span>or import from YouTube / Spotify</span></div>
+    <div class="url-row">
+      <input type="text" id="urlInput" placeholder="Paste a YouTube or Spotify URL…" autocomplete="off">
       <button id="urlLoadBtn" disabled>Load</button>
     </div>
   </div>
@@ -1233,7 +1242,7 @@ async function checkServer() {
     const r = await fetch(`${SERVER}/ping`, { signal: AbortSignal.timeout(800) });
     if (r.ok) {
       state.serverOnline = true;
-      document.getElementById('urlRow').style.display = 'flex';
+      document.getElementById('urlRow').style.display = 'block';
       document.getElementById('urlLoadBtn').disabled = false;
       labelEl.textContent = 'Bridge connected';
       statusEl.className = 'server-status online';
