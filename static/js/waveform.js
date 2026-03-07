@@ -32,7 +32,9 @@ export function drawWaveform() {
   const currentPosition = state.duration > 0
     ? ((!state.playing || !state.audioCtx)
       ? state.pausedAt
-      : Math.min((state.audioCtx.currentTime - state.startTime) * state.speed, state.duration))
+      : (state.loopEnabled
+          ? ((state.audioCtx.currentTime - state.startTime) * state.speed) % state.duration
+          : Math.min((state.audioCtx.currentTime - state.startTime) * state.speed, state.duration)))
     : 0;
 
   const pos = state.duration > 0 ? currentPosition / state.duration : 0;
