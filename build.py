@@ -408,6 +408,7 @@ const settings = {
   defaultSpeed: 0.75,
   defaultReverb: 40,
   defaultDecay: 3,
+  loopEnabled: false,
 };
 
 const SETTINGS_STORAGE_KEY = 'slowedReverbStudio.settings.v1';
@@ -422,6 +423,7 @@ function loadSettings() {
     if (Number.isFinite(parsed.defaultSpeed)) settings.defaultSpeed = parsed.defaultSpeed;
     if (Number.isFinite(parsed.defaultReverb)) settings.defaultReverb = parsed.defaultReverb;
     if (Number.isFinite(parsed.defaultDecay)) settings.defaultDecay = parsed.defaultDecay;
+    if (typeof parsed.loopEnabled === 'boolean') settings.loopEnabled = parsed.loopEnabled;
   } catch (err) {
     console.warn('Failed to load settings from localStorage', err);
   }
@@ -444,6 +446,7 @@ function syncSettingsUI() {
   state.speed = settings.defaultSpeed;
   state.reverbMix = settings.defaultReverb / 100;
   state.reverbDecay = settings.defaultDecay;
+  state.loopEnabled = settings.loopEnabled;
 
   document.getElementById('speedSlider').value = Math.round(state.speed * 100);
   document.getElementById('speedVal').textContent = state.speed.toFixed(2) + '×';
@@ -451,6 +454,8 @@ function syncSettingsUI() {
   document.getElementById('reverbVal').textContent = Math.round(state.reverbMix * 100) + '%';
   document.getElementById('decaySlider').value = Math.round(state.reverbDecay * 10);
   document.getElementById('decayVal').textContent = state.reverbDecay.toFixed(1) + 's';
+  updateLoopBtn();
+  document.getElementById('loopBtn').title = state.loopEnabled ? 'Loop On' : 'Loop Off';
 }
 
 loadSettings();
@@ -960,6 +965,8 @@ document.getElementById('endBtn').addEventListener('click', () => {
 
 document.getElementById('loopBtn').addEventListener('click', () => {
   state.loopEnabled = !state.loopEnabled;
+  settings.loopEnabled = state.loopEnabled;
+  saveSettings();
   if (state.source) state.source.loop = state.loopEnabled;
   updateLoopBtn();
   document.getElementById('loopBtn').title = state.loopEnabled ? 'Loop On' : 'Loop Off';
