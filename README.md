@@ -4,32 +4,6 @@ A browser-based audio editor for creating slowed + reverb versions of tracks. Im
 
 ## Usage
 
-Open `index.html` in your browser (double-click, or serve it with a simple static server).
-
-1. Drag an MP3 onto the drop zone (or click to browse), **or** paste a YouTube/Spotify URL into the import field
-2. Adjust the sliders:
-   - **Speed** — 0.50× to 1.50× (default 0.75×). Lower values create slowed vocals; higher values create sped-up vocals.
-   - **Reverb Mix** — dry/wet blend (default 40%)
-   - **Reverb Decay** — tail length in seconds (default 3s)
-3. Hit play to preview
-4. Click **Download MP3** → confirm the filename → exports with correct ID3 tags (title, artist, album art). The suggested name auto-adds `Slowed`/`Sped Up` and `Reverb` only when those effects are active.
-
-Keyboard shortcut: `Space` to play/pause. Click the waveform to seek.
-
-The gear icon (top right) opens settings to change default slider values.
-
-If you want to serve `index.html` over HTTP locally:
-
-```bash
-python3 -m http.server 8080
-```
-
-Then open `http://localhost:8080`.
-
----
-
-## YouTube & Spotify Import (requires Flask server)
-
 ### 1. Clone
 
 ```bash
@@ -66,7 +40,21 @@ SPOTIFY_CLIENT_SECRET=your_client_secret
 python server.py
 ```
 
-Then open `index.html` (or your local static server URL). When the backend is detected on `http://localhost:7337`, a URL import field appears below the drop zone. Paste any YouTube video URL or Spotify track/album/playlist URL — the studio streams live download progress directly in the UI.
+Then open **`http://localhost:7337`** in your browser.
+
+1. Drag an MP3 onto the drop zone (or click to browse), **or** paste a YouTube/Spotify URL into the import field
+2. Adjust the sliders:
+   - **Speed** — 0.50× to 1.50× (default 0.75×). Lower values create slowed vocals; higher values create sped-up vocals.
+   - **Reverb Mix** — dry/wet blend (default 40%)
+   - **Reverb Decay** — tail length in seconds (default 3s)
+3. Hit play to preview
+4. Click **Download MP3** → confirm the filename → exports with correct ID3 tags (title, artist, album art). The suggested name auto-adds `Slowed`/`Sped Up` and `Reverb` only when those effects are active.
+
+Keyboard shortcut: `Space` to play/pause. Click the waveform to seek.
+
+The gear icon (top right) opens settings to change default slider values.
+
+When the backend is running, a URL import field appears below the drop zone. Paste any YouTube video URL or Spotify track/album/playlist URL — the studio streams live download progress directly in the UI.
 
 ---
 
@@ -74,11 +62,28 @@ Then open `index.html` (or your local static server URL). When the backend is de
 
 ```
 slowed-reverb-studio/
-  index.html            — single-file frontend (Web Audio API, vanilla JS, lamejs encoder)
-  server.py             — Flask backend API (port 7337), SSE streaming
+  server.py             — Flask backend + static file serving (port 7337)
   studio_downloader.py  — integrated download engine (YouTube + Spotify)
   requirements.txt
   downloads/            — imported MP3s saved here
+  static/
+    index.html          — app shell (HTML structure only)
+    style.css           — all styles
+    lib/lame.min.js     — lamejs MP3 encoder (classic script, window.lamejs global)
+    js/
+      ui.js             — entry point, event listeners
+      audio.js          — Web Audio API pipeline
+      visualizer.js     — bottom visualizer + animation loop
+      waveform.js       — waveform rendering
+      loader.js         — file loading, track UI
+      importer.js       — SSE import flow
+      exporter.js       — MP3 export
+      settings.js       — settings persistence
+      theme.js          — color extraction + CSS theming
+      id3.js            — ID3v2 reader/writer
+      state.js          — shared state + settings objects
+      utils.js          — fmt, toast, sanitize, clamp helpers
+      config.js         — SERVER constant
 ```
 
 ### Live download status (SSE)
@@ -103,16 +108,16 @@ The studio has its own `studio_downloader.py` with callback-based progress rathe
 
 ## Technical notes
 
-- MP3 encoding uses [lamejs](https://github.com/zhuker/lamejs) bundled inline at 192 kbps stereo
+- MP3 encoding uses [lamejs](https://github.com/zhuker/lamejs) served at `static/lib/lame.min.js` at 192 kbps stereo
 - Reverb impulse response is generated algorithmically (exponential noise decay) — no IR file needed
 - Export renders via `OfflineAudioContext` then encodes to MP3 with a hand-written ID3v2.3 tag prepended
 - Speed change intentionally shifts pitch (no pitch correction) — this is the slowed & reverb sound
 - YouTube downloads use yt-dlp with Android/web player clients to avoid 403s
 - Spotify uses the Client Credentials API flow — no user login required
 
-### Rebuilding `index.html`
+### lame.min.js
 
-If you update the UI source in `build.py`, regenerate `index.html` with:
+`static/lib/lame.min.js` is committed to the repo. If it's missing, re-download it:
 
 ```bash
 python build.py
