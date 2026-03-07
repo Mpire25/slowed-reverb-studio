@@ -850,6 +850,8 @@ const state = {
   visualizerEnabled: true,
   visualizerFreqData: null,
   visualizerBarData: null,
+  visualizerTimeData: null,
+  visualizerLoudness: 0,
 };
 
 const settings = {
@@ -1332,8 +1334,21 @@ function drawBottomVisualizer(clearOnly = false) {
   if (!state.visualizerFreqData || state.visualizerFreqData.length !== binCount) {
     state.visualizerFreqData = new Uint8Array(binCount);
   }
+  if (!state.visualizerTimeData || state.visualizerTimeData.length !== analyser.fftSize) {
+    state.visualizerTimeData = new Uint8Array(analyser.fftSize);
+  }
   analyser.getByteFrequencyData(state.visualizerFreqData);
+  analyser.getByteTimeDomainData(state.visualizerTimeData);
   const now = Date.now() * 0.001;
+
+  let rmsSum = 0;
+  for (let i = 0; i < state.visualizerTimeData.length; i += 2) {
+    const sample = (state.visualizerTimeData[i] - 128) / 128;
+    rmsSum += sample * sample;
+  }
+  const rms = Math.sqrt(rmsSum / (state.visualizerTimeData.length / 2));
+  const loudnessNow = Math.min(1, rms * 4.5);
+  state.visualizerLoudness = state.visualizerLoudness * 0.82 + loudnessNow * 0.18;
 
   const pointCount = Math.max(22, Math.floor(W / 26));
   if (!state.visualizerBarData || state.visualizerBarData.length !== pointCount) {
@@ -1352,6 +1367,7 @@ function drawBottomVisualizer(clearOnly = false) {
   const lowMid = getEnergy(0.08, 0.22);
   const high = getEnergy(0.22, 0.55);
   const pulse = Math.min(1, bass * 0.55 + lowMid * 0.3 + high * 0.15);
+  const intensity = 0.35 + pulse * 0.45 + state.visualizerLoudness * 0.8;
   const hueDrift = now * 0.46;
   const hueA = 262 + Math.sin(hueDrift) * 26;         // purple
   const hueB = 192 + Math.sin(hueDrift + 1.8) * 22;   // cyan
@@ -1359,20 +1375,20 @@ function drawBottomVisualizer(clearOnly = false) {
   const gradShift = (Math.sin(now * 0.11) * 0.5 + 0.5) * W * 0.34;
 
   const haze = ctx2d.createLinearGradient(gradShift, H, W - gradShift, 0);
-  haze.addColorStop(0, `hsla(${hueA.toFixed(1)},88%,57%,${0.08 + pulse * 0.16})`);
-  haze.addColorStop(0.45, `hsla(${hueC.toFixed(1)},86%,64%,${0.06 + pulse * 0.1})`);
+  haze.addColorStop(0, `hsla(${hueA.toFixed(1)},88%,57%,${(0.08 + pulse * 0.16) * intensity})`);
+  haze.addColorStop(0.45, `hsla(${hueC.toFixed(1)},86%,64%,${(0.06 + pulse * 0.1) * intensity})`);
   haze.addColorStop(1, `hsla(${hueB.toFixed(1)},92%,56%,0)`);
   ctx2d.fillStyle = haze;
   ctx2d.fillRect(0, 0, W, H);
 
   const bloomLeft = ctx2d.createRadialGradient(W * 0.18, H * 0.9, 0, W * 0.18, H * 0.9, W * 0.42);
-  bloomLeft.addColorStop(0, `hsla(${hueA.toFixed(1)},90%,60%,${0.12 + bass * 0.28})`);
+  bloomLeft.addColorStop(0, `hsla(${hueA.toFixed(1)},90%,60%,${(0.12 + bass * 0.28) * intensity})`);
   bloomLeft.addColorStop(1, `hsla(${hueA.toFixed(1)},90%,60%,0)`);
   ctx2d.fillStyle = bloomLeft;
   ctx2d.fillRect(0, 0, W, H);
 
   const bloomRight = ctx2d.createRadialGradient(W * 0.84, H * 0.88, 0, W * 0.84, H * 0.88, W * 0.44);
-  bloomRight.addColorStop(0, `hsla(${hueB.toFixed(1)},94%,55%,${0.12 + high * 0.22})`);
+  bloomRight.addColorStop(0, `hsla(${hueB.toFixed(1)},94%,55%,${(0.12 + high * 0.22) * intensity})`);
   bloomRight.addColorStop(1, `hsla(${hueB.toFixed(1)},94%,55%,0)`);
   ctx2d.fillStyle = bloomRight;
   ctx2d.fillRect(0, 0, W, H);
@@ -1426,10 +1442,10 @@ function drawBottomVisualizer(clearOnly = false) {
 
   ctx2d.shadowBlur = 24;
   ctx2d.shadowColor = 'rgba(124,58,237,0.2)';
-  drawWave(H - VISUALIZER_TUNING.baseOffsetA, VISUALIZER_TUNING.ampA, `hsla(${hueA.toFixed(1)},90%,60%,0.62)`, `hsla(${hueB.toFixed(1)},92%,56%,0.54)`, 0.58, 18, 1.2, 8.8);
-  drawWave(H - VISUALIZER_TUNING.baseOffsetB, VISUALIZER_TUNING.ampB, `hsla(${hueC.toFixed(1)},88%,68%,0.52)`, `hsla(${hueB.toFixed(1)},94%,62%,0.48)`, 0.48, 14, 1.55, 10.2);
+  drawWave(H - VISUALIZER_TUNING.baseOffsetA, VISUALIZER_TUNING.ampA, `hsla(${hueA.toFixed(1)},90%,60%,0.62)`, `hsla(${hueB.toFixed(1)},92%,56%,0.54)`, 0.34 + state.visualizerLoudness * 0.9, 18, 1.2, 8.8);
+  drawWave(H - VISUALIZER_TUNING.baseOffsetB, VISUALIZER_TUNING.ampB, `hsla(${hueC.toFixed(1)},88%,68%,0.52)`, `hsla(${hueB.toFixed(1)},94%,62%,0.48)`, 0.28 + state.visualizerLoudness * 0.7, 14, 1.55, 10.2);
   ctx2d.shadowBlur = 0;
-  drawWave(H - VISUALIZER_TUNING.baseOffsetC, VISUALIZER_TUNING.ampC, `hsla(${hueA.toFixed(1)},76%,80%,0.42)`, `hsla(${hueB.toFixed(1)},86%,76%,0.36)`, 0.34, 10, 1.8, 11.4);
+  drawWave(H - VISUALIZER_TUNING.baseOffsetC, VISUALIZER_TUNING.ampC, `hsla(${hueA.toFixed(1)},76%,80%,0.42)`, `hsla(${hueB.toFixed(1)},86%,76%,0.36)`, 0.24 + state.visualizerLoudness * 0.5, 10, 1.8, 11.4);
 
   ctx2d.globalAlpha = 1;
   ctx2d.setTransform(1,0,0,1,0,0);
@@ -1558,6 +1574,8 @@ function resetStudio() {
   state.waveformData = null;
   state.visualizerFreqData = null;
   state.visualizerBarData = null;
+  state.visualizerTimeData = null;
+  state.visualizerLoudness = 0;
   state.duration = 0;
   state.pausedAt = 0;
   state.playing = false;
