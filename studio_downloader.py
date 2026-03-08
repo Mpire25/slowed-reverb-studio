@@ -134,23 +134,124 @@ def _get_spotify_tracks(url, token):
 
 # ── YouTube Music search ───────────────────────────────────────────────────────
 
+_JUNK_KEYWORDS = re.compile(
+    r'\b(remix|remaster|re-?master|cover|karaoke|instrumental|backing|tribute|version|edit|re-?edit|bootleg|mashup|acoustic|live)\b',
+    re.IGNORECASE,
+)
+
+
+def _core_title(s):
+    """Strip bracketed/parenthesised content and normalise."""
+    s = re.sub(r'\[.*?\]', '', s)
+    s = re.sub(r'\(.*?\)', '', s)
+    return re.sub(r'[^\w\s]', '', s.lower()).strip()
+
+
+def _strip_artist_prefix(title, artist):
+    """Strip 'Artist - ' prefix from YouTube-style titles."""
+    for sep in [' - ', ': ', ' — ']:
+        idx = title.lower().find(sep)
+        if idx > 0 and _core_title(artist) in _core_title(title[:idx]):
+            return title[idx + len(sep):]
+    return title
+
+
+def _score_result(result, expected_title, expected_artist, duration_s):
+    """Return a confidence score 0–100 for a YouTube Music/YouTube result."""
+    result_title = result.get("title", "")
+    vid_duration = result.get("duration_seconds") or 0
+
+    # Title: exact core match only — no partial credit (avoids "Kiss" matching "Kiss Me Again")
+    # Also try stripping "Artist - " prefix for YouTube-style titles
+    core_exp = _core_title(expected_title)
+    core_res = _core_title(result_title)
+    if core_exp != core_res:
+        core_res = _core_title(_strip_artist_prefix(result_title, expected_artist))
+    title_score = 40 if core_exp == core_res else 0
+
+    # Artist: check any result artist contains expected artist name
+    result_artists = " ".join(
+        a.get("name", "") for a in (result.get("artists") or [])
+    ).lower()
+    artist_score = 30 if _core_title(expected_artist) in result_artists else 0
+
+    # Duration: within 2s = 30pts, within 10s = 20pts, within 20s = 10pts
+    diff = abs(vid_duration - duration_s)
+    if diff <= 2:
+        dur_score = 30
+    elif diff <= 10:
+        dur_score = 20
+    elif diff <= 20:
+        dur_score = 10
+    else:
+        dur_score = 0
+
+    # Junk penalty — skip if the expected title is itself a remix/etc
+    expected_is_junk = bool(_JUNK_KEYWORDS.search(expected_title))
+    junk_penalty = 0 if expected_is_junk else (-20 if _JUNK_KEYWORDS.search(result_title) else 0)
+
+    return title_score + artist_score + dur_score + junk_penalty
+
+
+_DEBUG_LOG = STUDIO_DIR / "search_debug.log"
+
+
+def _dlog(msg):
+    print(msg)
+    with open(_DEBUG_LOG, "a", encoding="utf-8") as f:
+        f.write(msg + "\n")
+
+
 def _find_youtube_id(track):
-    """Search YouTube Music for best matching video ID."""
+    """Search YouTube Music, fall back to YouTube search if confidence is low."""
     from ytmusicapi import YTMusic
     query = f"{track['artist']} - {track['name']}"
     duration_s = track["duration_ms"] // 1000
+    _dlog(f"\n{'='*60}\n[search] query={query!r} duration={duration_s}s")
+
+    best_id = None
+    best_score = 0
+    best_is_junk = False
+    any_title_match = False
+
     try:
         ytm = YTMusic()
-        results = ytm.search(query, filter="songs", limit=5)
+        results = ytm.search(query, filter="songs", limit=20)
         for result in results:
-            vid_duration = result.get("duration_seconds") or 0
-            if abs(vid_duration - duration_s) <= 15:
-                return result["videoId"]
-        if results:
-            return results[0]["videoId"]
-    except Exception:
-        pass
-    return None
+            score = _score_result(result, track["name"], track["artist"], duration_s)
+            _dlog(f"  ytmusic: {result.get('title')!r} dur={result.get('duration_seconds')}s score={score}")
+            if _core_title(result.get("title", "")) == _core_title(track["name"]):
+                any_title_match = True
+            if score > best_score:
+                best_score = score
+                best_id = result["videoId"]
+                best_is_junk = bool(_JUNK_KEYWORDS.search(result.get("title", "")))
+    except Exception as e:
+        _dlog(f"[search] YTMusic ERROR: {e}")
+
+    # Fall back to YouTube if: low confidence, best is junk, or no title match at all
+    if best_score < 50 or best_is_junk or not any_title_match:
+        _dlog(f"  [low confidence={best_score}] falling back to YouTube search")
+        try:
+            with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
+                info = ydl.extract_info(f"ytsearch5:{query}", download=False)
+                for entry in (info.get("entries") or []):
+                    fake_result = {
+                        "title": entry.get("title", ""),
+                        "artists": [{"name": entry.get("uploader", "")}],
+                        "duration_seconds": entry.get("duration") or 0,
+                        "videoId": entry.get("id"),
+                    }
+                    score = _score_result(fake_result, track["name"], track["artist"], duration_s)
+                    _dlog(f"  youtube: {fake_result['title']!r} dur={fake_result['duration_seconds']}s score={score}")
+                    if score > best_score:
+                        best_score = score
+                        best_id = fake_result["videoId"]
+        except Exception as e:
+            _dlog(f"[search] YouTube fallback ERROR: {e}")
+
+    _dlog(f"  [chosen] id={best_id} score={best_score}")
+    return best_id
 
 
 # ── Art & tag embedding ────────────────────────────────────────────────────────
