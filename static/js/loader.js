@@ -110,10 +110,10 @@ export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceL
     void applyThemeFromCurrentTrack();
     showPlayerUI(true);
     updateSourceImportUI();
-    toast('Track loaded');
+    toast('Track loaded', 3000, 'success');
     if (autoPlay) play();
   } catch (err) {
-    toast('Failed to decode audio: ' + err.message);
+    toast('Failed to decode audio: ' + err.message, 5000, 'error');
     console.error(err);
   } finally {
     showLoading(false);

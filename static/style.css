@@ -382,6 +382,9 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
   transition:opacity .25s,transform .25s;white-space:nowrap;z-index:300;
 }
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast-error{background:#1f1215;border-color:rgba(248,113,113,.35);color:#fca5a5;box-shadow:0 8px 32px rgba(0,0,0,.4),0 0 0 1px rgba(248,113,113,.1)}
+.toast-success{background:#111f17;border-color:rgba(74,222,128,.35);color:#86efac;box-shadow:0 8px 32px rgba(0,0,0,.4),0 0 0 1px rgba(74,222,128,.1)}
+.toast-info{background:#1e1e2e;border-color:var(--border)}
 
 .progress-bar{height:3px;border-radius:3px;background:linear-gradient(90deg,var(--accent1),var(--accent2));width:0%;transition:width .3s}
 .progress-wrap{background:rgba(255,255,255,.08);border-radius:3px;margin-top:8px;overflow:hidden}

@@ -26,10 +26,10 @@ export function sanitize(s) {
   return s.replace(/[<>:"/\\|?*\x00-\x1f]/g, '').trim() || 'track';
 }
 
-export function toast(msg, ms = 3000) {
+export function toast(msg, ms = 3000, type = 'info') {
   const el = document.getElementById('toast');
   el.textContent = msg;
-  el.classList.add('show');
+  el.className = `toast toast-${type} show`;
   clearTimeout(el._t);
   el._t = setTimeout(() => el.classList.remove('show'), ms);
 }
