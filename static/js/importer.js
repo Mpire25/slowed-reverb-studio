@@ -24,6 +24,7 @@ export function initImporter() {
       statusEl.className = 'server-status';
     }
     updateSourceImportUI();
+    if (state.serverOnline) urlInput.focus();
   }
 
   checkServer();
