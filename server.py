@@ -67,9 +67,41 @@ def extract_tags(mp3_path):
         return Path(mp3_path).stem, "Unknown"
 
 
+_ytmusic = None
+
+def _get_ytmusic():
+    global _ytmusic
+    if _ytmusic is None:
+        from ytmusicapi import YTMusic
+        _ytmusic = YTMusic()
+    return _ytmusic
+
+
 @app.route("/ping")
 def ping():
     return "pong"
+
+
+@app.route("/api/search")
+def search():
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify({"error": "No query"}), 400
+    try:
+        yt = _get_ytmusic()
+        results = yt.search(q, filter="songs", limit=8)
+        out = []
+        for r in results:
+            out.append({
+                "videoId": r.get("videoId"),
+                "title": r.get("title", ""),
+                "artist": r["artists"][0]["name"] if r.get("artists") else "",
+                "duration": r.get("duration", ""),
+                "thumbnail": r["thumbnails"][-1]["url"] if r.get("thumbnails") else None,
+            })
+        return jsonify(out)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/download/stream")
