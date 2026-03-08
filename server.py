@@ -193,4 +193,4 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7337))
     print("Slowed & Reverb Studio — server")
     print(f"Open http://localhost:{port} in your browser")
-    app.run(host="127.0.0.1", port=port, debug=False, threaded=True)
+    app.run(host="127.0.0.1", port=port, debug=False, threaded=True, use_reloader=True)
