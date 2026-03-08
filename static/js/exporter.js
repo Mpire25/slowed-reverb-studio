@@ -106,10 +106,10 @@ export async function doExport(filename) {
     setTimeout(() => URL.revokeObjectURL(url), 10000);
 
     setProgress(100);
-    toast('Download started!');
+    toast('Download started!', 3000, 'success');
     setTimeout(closeModal, 800);
   } catch (err) {
-    toast('Export failed: ' + err.message, 5000);
+    toast('Export failed: ' + err.message, 5000, 'error');
     console.error(err);
     confirmBtn.disabled = false;
     confirmBtn.textContent = 'Export';

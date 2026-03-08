@@ -331,7 +331,7 @@ function startDownload(url) {
       statusEl.classList.remove('expanded', 'live');
     } catch (err) {
       setImportStage('✗ ' + err.message);
-      toast('Error: ' + err.message, 5000);
+      toast('Error: ' + err.message, 5000, 'error');
     } finally {
       restoreInputs();
     }
@@ -341,7 +341,7 @@ function startDownload(url) {
     es.close();
     let msg = 'Download failed';
     try { msg = JSON.parse(e.data).message; } catch {}
-    toast('Error: ' + msg, 5000);
+    toast('Error: ' + msg, 5000, 'error');
     if (confirmed) hideImportStatus();
     restoreInputs();
   });
@@ -349,7 +349,7 @@ function startDownload(url) {
   es.onerror = () => {
     if (es.readyState === EventSource.CLOSED) return;
     es.close();
-    toast('Connection lost', 3000);
+    toast('Connection lost', 3000, 'error');
     if (confirmed) hideImportStatus();
     restoreInputs();
   };
