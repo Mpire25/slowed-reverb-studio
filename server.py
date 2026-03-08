@@ -5,6 +5,7 @@ Runs on port 7337. Provides SSE-based download streaming and file serving.
 """
 
 import json
+import os
 import queue
 import threading
 import time
@@ -189,6 +190,7 @@ def static_files(filename):
 
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 7337))
     print("Slowed & Reverb Studio — server")
-    print("Open http://localhost:7337 in your browser")
-    app.run(host="127.0.0.1", port=7337, debug=False, threaded=True)
+    print(f"Open http://localhost:{port} in your browser")
+    app.run(host="127.0.0.1", port=port, debug=False, threaded=True)
