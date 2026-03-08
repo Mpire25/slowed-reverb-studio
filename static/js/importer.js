@@ -179,18 +179,27 @@ function startDownload(url) {
     statusEl.classList.toggle('expanded', showTrackMeta);
   };
 
-  // Hide tabs and active mode during loading
-  const tabsEl   = document.querySelector('.import-tabs');
-  const urlMode  = document.getElementById('urlMode');
+  // Hide drop zone, divider, tabs and active mode during loading
+  const dropZone  = document.getElementById('dropZone');
+  const dividerEl = document.querySelector('.url-divider');
+  const tabsEl    = document.querySelector('.import-tabs');
+  const urlMode   = document.getElementById('urlMode');
   const searchModeEl = document.getElementById('searchMode');
-  tabsEl.style.display = 'none';
-  urlMode.style.display = 'none';
-  searchModeEl.style.display = 'none';
+  const searchActive = document.getElementById('tabSearch').classList.contains('active');
+
+  dropZone.classList.add('load-hiding');
+  dividerEl.classList.add('load-hiding');
+  tabsEl.classList.add('load-hiding');
+  if (searchActive) searchModeEl.classList.add('load-hiding');
+  else urlMode.classList.add('load-hiding');
 
   const restoreInputs = () => {
-    tabsEl.style.display = '';
-    // Re-show whichever mode was active (check active tab)
-    const searchActive = document.getElementById('tabSearch').classList.contains('active');
+    dropZone.classList.remove('load-hiding');
+    dividerEl.classList.remove('load-hiding');
+    tabsEl.classList.remove('load-hiding');
+    urlMode.classList.remove('load-hiding');
+    searchModeEl.classList.remove('load-hiding');
+    // Keep inactive mode hidden via display
     urlMode.style.display = searchActive ? 'none' : '';
     searchModeEl.style.display = searchActive ? '' : 'none';
     btn.disabled = false;
