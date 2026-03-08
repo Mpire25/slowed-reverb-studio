@@ -233,4 +233,7 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     if (state.audioBuffer) state.playing ? pause() : play();
   }
+  if (e.key === 'N' && e.shiftKey) {
+    if (state.audioBuffer) resetStudio();
+  }
 });
