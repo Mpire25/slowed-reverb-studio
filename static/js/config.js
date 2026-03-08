@@ -1,1 +1,1 @@
-export const SERVER = 'http://localhost:7337';
+export const SERVER = `${window.location.protocol}//${window.location.host}`;
