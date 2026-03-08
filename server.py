@@ -7,6 +7,7 @@ Runs on port 7337. Provides SSE-based download streaming and file serving.
 import json
 import queue
 import threading
+import time
 from pathlib import Path
 
 from flask import Flask, Response, jsonify, request, send_file, send_from_directory, stream_with_context
@@ -18,6 +19,36 @@ CORS(app)
 STUDIO_DIR = Path(__file__).parent
 DOWNLOADS_DIR = STUDIO_DIR / "downloads"
 STATIC_DIR = STUDIO_DIR / "static"
+
+
+CLEANUP_INTERVAL = 30 * 60  # seconds between periodic sweeps
+CLEANUP_MAX_AGE  = 60 * 60  # files older than this are deleted
+
+
+def cleanup_downloads(max_age=None):
+    """Delete orphaned MP3s from the downloads directory.
+    If max_age is None, deletes all MP3s (used at startup).
+    """
+    if not DOWNLOADS_DIR.exists():
+        return
+    now = time.time()
+    for f in DOWNLOADS_DIR.glob("*.mp3"):
+        if max_age is None or (now - f.stat().st_mtime) > max_age:
+            try:
+                f.unlink()
+            except OSError:
+                pass
+
+
+def _cleanup_loop():
+    while True:
+        time.sleep(CLEANUP_INTERVAL)
+        cleanup_downloads(max_age=CLEANUP_MAX_AGE)
+
+
+# Delete any leftover files from a previous server run, then start background sweeper
+cleanup_downloads()
+threading.Thread(target=_cleanup_loop, daemon=True).start()
 
 
 def _sse(event_type, data):
