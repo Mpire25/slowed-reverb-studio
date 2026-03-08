@@ -165,4 +165,6 @@ export function resetStudio() {
   updateSourceImportUI();
   updateBottomVisualizerPlaybackState();
   void applyThemeFromCurrentTrack();
+
+  if (urlInput) urlInput.focus();
 }
