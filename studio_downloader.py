@@ -193,21 +193,11 @@ def _score_result(result, expected_title, expected_artist, duration_s):
     return title_score + artist_score + dur_score + junk_penalty
 
 
-_DEBUG_LOG = STUDIO_DIR / "search_debug.log"
-
-
-def _dlog(msg):
-    print(msg)
-    with open(_DEBUG_LOG, "a", encoding="utf-8") as f:
-        f.write(msg + "\n")
-
-
 def _find_youtube_id(track):
     """Search YouTube Music, fall back to YouTube search if confidence is low."""
     from ytmusicapi import YTMusic
     query = f"{track['artist']} - {track['name']}"
     duration_s = track["duration_ms"] // 1000
-    _dlog(f"\n{'='*60}\n[search] query={query!r} duration={duration_s}s")
 
     best_id = None
     best_score = 0
@@ -219,20 +209,18 @@ def _find_youtube_id(track):
         results = ytm.search(query, filter="songs", limit=20)
         for result in results:
             score = _score_result(result, track["name"], track["artist"], duration_s)
-            _dlog(f"  ytmusic: {result.get('title')!r} dur={result.get('duration_seconds')}s score={score}")
             if _core_title(result.get("title", "")) == _core_title(track["name"]):
                 any_title_match = True
             if score > best_score:
                 best_score = score
                 best_id = result["videoId"]
                 best_is_junk = bool(_JUNK_KEYWORDS.search(result.get("title", "")))
-    except Exception as e:
-        _dlog(f"[search] YTMusic ERROR: {e}")
+    except Exception:
+        pass
 
     # Fall back to YouTube if: low confidence, best is junk, or no title match at all
     # If best is junk, reset score to 0 so any clean YouTube result can win
     if best_score < 50 or best_is_junk or not any_title_match:
-        _dlog(f"  [low confidence={best_score} junk={best_is_junk}] falling back to YouTube search")
         if best_is_junk:
             best_score = 0
         try:
@@ -246,14 +234,12 @@ def _find_youtube_id(track):
                         "videoId": entry.get("id"),
                     }
                     score = _score_result(fake_result, track["name"], track["artist"], duration_s)
-                    _dlog(f"  youtube: {fake_result['title']!r} dur={fake_result['duration_seconds']}s score={score}")
                     if score > best_score:
                         best_score = score
                         best_id = fake_result["videoId"]
-        except Exception as e:
-            _dlog(f"[search] YouTube fallback ERROR: {e}")
+        except Exception:
+            pass
 
-    _dlog(f"  [chosen] id={best_id} score={best_score}")
     return best_id
 
 
