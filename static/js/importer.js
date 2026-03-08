@@ -179,6 +179,25 @@ function startDownload(url) {
     statusEl.classList.toggle('expanded', showTrackMeta);
   };
 
+  // Hide tabs and active mode during loading
+  const tabsEl   = document.querySelector('.import-tabs');
+  const urlMode  = document.getElementById('urlMode');
+  const searchModeEl = document.getElementById('searchMode');
+  tabsEl.style.display = 'none';
+  urlMode.style.display = 'none';
+  searchModeEl.style.display = 'none';
+
+  const restoreInputs = () => {
+    tabsEl.style.display = '';
+    // Re-show whichever mode was active (check active tab)
+    const searchActive = document.getElementById('tabSearch').classList.contains('active');
+    urlMode.style.display = searchActive ? 'none' : '';
+    searchModeEl.style.display = searchActive ? '' : 'none';
+    btn.disabled = false;
+    urlInput.disabled = false;
+    btn.textContent = 'Load';
+  };
+
   // Disable inputs while loading
   btn.disabled = true;
   urlInput.disabled = true;
@@ -295,9 +314,7 @@ function startDownload(url) {
       setImportStage('✗ ' + err.message);
       toast('Error: ' + err.message, 5000);
     } finally {
-      btn.disabled = false;
-      urlInput.disabled = false;
-      btn.textContent = 'Load';
+      restoreInputs();
     }
   });
 
@@ -307,17 +324,13 @@ function startDownload(url) {
     try { msg = JSON.parse(e.data).message; } catch {}
     setImportStage('✗ ' + msg);
     toast('Error: ' + msg, 5000);
-    btn.disabled = false;
-    urlInput.disabled = false;
-    btn.textContent = 'Load';
+    restoreInputs();
   });
 
   es.onerror = () => {
     if (es.readyState === EventSource.CLOSED) return;
     es.close();
     setImportStage('✗ Connection lost');
-    btn.disabled = false;
-    urlInput.disabled = false;
-    btn.textContent = 'Load';
+    restoreInputs();
   };
 }
