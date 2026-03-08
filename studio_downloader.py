@@ -230,8 +230,11 @@ def _find_youtube_id(track):
         _dlog(f"[search] YTMusic ERROR: {e}")
 
     # Fall back to YouTube if: low confidence, best is junk, or no title match at all
+    # If best is junk, reset score to 0 so any clean YouTube result can win
     if best_score < 50 or best_is_junk or not any_title_match:
-        _dlog(f"  [low confidence={best_score}] falling back to YouTube search")
+        _dlog(f"  [low confidence={best_score} junk={best_is_junk}] falling back to YouTube search")
+        if best_is_junk:
+            best_score = 0
         try:
             with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
                 info = ydl.extract_info(f"ytsearch5:{query}", download=False)
