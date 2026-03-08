@@ -427,6 +427,42 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
 .import-track-err{color:#f87171;flex-shrink:0}
 @keyframes importFadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
 
+/* ── Import tabs ── */
+.import-tabs{display:flex;gap:6px;margin-bottom:12px}
+.import-tab{
+  padding:6px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;
+  color:var(--muted);font-size:.8rem;font-weight:600;cursor:pointer;
+  transition:background .18s,color .18s,border-color .18s;
+}
+.import-tab:hover{background:rgba(255,255,255,.05);color:var(--text)}
+.import-tab.active{
+  background:linear-gradient(135deg,rgba(var(--accent1-rgb),.18),rgba(var(--accent2-rgb),.12));
+  border-color:rgba(var(--accent1-rgb),.45);color:var(--text);
+}
+
+/* ── Search results ── */
+.search-results{
+  margin-top:6px;border-radius:12px;border:1px solid var(--border);
+  background:rgba(16,16,26,.96);backdrop-filter:blur(14px);
+  overflow:hidden;max-height:280px;overflow-y:auto;
+}
+.search-result-item{
+  display:flex;align-items:center;gap:12px;padding:10px 12px;cursor:pointer;
+  transition:background .15s;
+}
+.search-result-item:hover{background:rgba(var(--accent1-rgb),.1)}
+.search-result-item+.search-result-item{border-top:1px solid rgba(255,255,255,.05)}
+.search-result-thumb{
+  width:42px;height:42px;border-radius:6px;flex-shrink:0;overflow:hidden;
+  background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;font-size:1.2rem;
+}
+.search-result-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.search-result-info{flex:1;min-width:0}
+.search-result-title{font-size:.875rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.search-result-meta{font-size:.76rem;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.search-result-loading{padding:16px;display:flex;justify-content:center}
+.search-result-empty{padding:14px 16px;font-size:.82rem;color:var(--muted);text-align:center}
+
 /* ── Spinner ── */
 @keyframes spin{to{transform:rotate(360deg)}}
 .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:6px}

@@ -56,10 +56,24 @@
 
   <!-- URL import -->
   <div class="url-section" id="urlRow" style="display:none">
-    <div class="url-divider"><span>or import from YouTube / Spotify</span></div>
-    <div class="url-row">
-      <input type="text" id="urlInput" placeholder="Paste a YouTube or Spotify URL…" autocomplete="off">
-      <button id="urlLoadBtn" disabled>Load</button>
+    <div class="url-divider"><span>or import</span></div>
+    <div class="import-tabs">
+      <button class="import-tab active" id="tabUrl">URL</button>
+      <button class="import-tab" id="tabSearch">Search</button>
+    </div>
+    <!-- URL mode -->
+    <div id="urlMode">
+      <div class="url-row">
+        <input type="text" id="urlInput" placeholder="Paste a YouTube or Spotify URL…" autocomplete="off">
+        <button id="urlLoadBtn" disabled>Load</button>
+      </div>
+    </div>
+    <!-- Search mode -->
+    <div id="searchMode" style="display:none">
+      <div class="url-row">
+        <input type="text" id="searchInput" placeholder="Search for a song on YouTube Music…" autocomplete="off">
+      </div>
+      <div class="search-results" id="searchResults" style="display:none"></div>
     </div>
     <!-- Live import status -->
     <div class="import-status" id="importStatus" style="display:none">
