@@ -7,9 +7,21 @@ Runs on port 7337. Provides SSE-based download streaming and file serving.
 import json
 import os
 import queue
+import re
 import threading
 import time
 from pathlib import Path
+
+_ANSI_RE = re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
+_YTDLP_PREFIX_RE = re.compile(r'^(ERROR|WARNING):\s*(\[[^\]]+\]\s*)?', re.IGNORECASE)
+
+def _clean(msg: str) -> str:
+    msg = _ANSI_RE.sub('', msg).strip()
+    # Take only the first line (yt-dlp sometimes appends stack traces)
+    msg = msg.splitlines()[0].strip() if msg else msg
+    # Strip "ERROR: [extractor] " prefix from yt-dlp messages
+    msg = _YTDLP_PREFIX_RE.sub('', msg).strip()
+    return msg
 
 from flask import Flask, Response, jsonify, request, send_file, send_from_directory, stream_with_context
 from flask_cors import CORS
@@ -101,7 +113,7 @@ def search():
             })
         return jsonify(out)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": _clean(str(e))}), 500
 
 
 @app.route("/api/download/stream")
@@ -149,7 +161,7 @@ def download_stream():
                     "artist": info["artist"],
                 })
         except Exception as e:
-            on_event("error", {"message": str(e)})
+            on_event("error", {"message": _clean(str(e))})
         finally:
             q.put(None)  # sentinel
 

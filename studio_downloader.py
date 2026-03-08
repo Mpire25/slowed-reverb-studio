@@ -19,6 +19,14 @@ from mutagen.id3 import ID3, APIC, TIT2, TPE1, TALB, ID3NoHeaderError
 STUDIO_DIR = Path(__file__).parent
 DOWNLOADS_DIR = STUDIO_DIR / "downloads"
 
+_ANSI_RE = re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
+_PREFIX_RE = re.compile(r'^(ERROR|WARNING):\s*(\[[^\]]+\]\s*)?', re.IGNORECASE)
+
+def _clean_error(msg: str) -> str:
+    msg = _ANSI_RE.sub('', msg).strip()
+    msg = msg.splitlines()[0].strip() if msg else msg
+    return _PREFIX_RE.sub('', msg).strip()
+
 # Load .env from studio directory
 _env_file = STUDIO_DIR / ".env"
 if _env_file.exists():
@@ -422,7 +430,7 @@ def download_spotify(url, on_event):
             on_event("track_error", {
                 "index": i,
                 "title": track["name"],
-                "error": str(e),
+                "error": _clean_error(str(e)),
             })
 
     if not results:
