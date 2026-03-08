@@ -147,8 +147,7 @@ header{display:flex;align-items:center;justify-content:space-between;max-width:1
 }
 .album-art-img.loaded{opacity:1}
 .track-info{flex:1;min-width:0}
-.track-title{font-size:1.05rem;font-weight:600;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:text;outline:none;border-radius:4px;padding:1px 3px;margin-left:-3px;transition:background .15s}
-.track-title:focus{background:rgba(255,255,255,.07);white-space:normal;overflow:visible;text-overflow:clip}
+.track-title{font-size:1.05rem;font-weight:600;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .track-artist{font-size:.85rem;color:var(--muted);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .track-meta-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .track-duration{font-size:.8rem;color:var(--muted)}

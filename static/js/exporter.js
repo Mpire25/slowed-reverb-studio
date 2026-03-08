@@ -83,7 +83,7 @@ export async function doExport(filename) {
     if (flush.length) mp3Parts.push(new Uint8Array(flush));
     setProgress(92);
 
-    const title = document.getElementById('trackTitle').textContent.trim() || state.title;
+    const title = state.title;
     const artBytes = state.artBytes
       ? new Uint8Array(state.artBytes)
       : null;

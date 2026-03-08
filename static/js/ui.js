@@ -143,7 +143,7 @@ document.getElementById('newSongBtn').addEventListener('click', resetStudio);
 // ─── Export Modal ────────────────────────────────────────────────────────────
 document.getElementById('downloadBtn').addEventListener('click', () => {
   if (!state.audioBuffer) return;
-  const title = document.getElementById('trackTitle').textContent.trim() || state.title;
+  const title = state.title;
   const suffix = getExportSuffix();
   const artist = state.artist;
   const suggested = sanitize(`${artist} - ${title}${suffix}`) + '.mp3';
@@ -228,7 +228,7 @@ window.addEventListener('resize', () => {
 
 // ─── Keyboard shortcuts ──────────────────────────────────────────────────────
 document.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT' || (e.target.getAttribute && e.target.getAttribute('contenteditable') === 'true')) return;
+  if (e.target.tagName === 'INPUT') return;
   if (e.code === 'Space') {
     e.preventDefault();
     if (state.audioBuffer) state.playing ? pause() : play();
