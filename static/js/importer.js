@@ -187,11 +187,21 @@ function startDownload(url) {
   const searchModeEl = document.getElementById('searchMode');
   const searchActive = document.getElementById('tabSearch').classList.contains('active');
 
-  dropZone.classList.add('load-hiding');
-  dividerEl.classList.add('load-hiding');
-  tabsEl.classList.add('load-hiding');
-  if (searchActive) searchModeEl.classList.add('load-hiding');
-  else urlMode.classList.add('load-hiding');
+  // Only show loading UI once we have confirmation it's real
+  let confirmed = false;
+
+  const confirmAndShow = () => {
+    if (confirmed) return;
+    confirmed = true;
+    dropZone.classList.add('load-hiding');
+    dividerEl.classList.add('load-hiding');
+    tabsEl.classList.add('load-hiding');
+    if (searchActive) searchModeEl.classList.add('load-hiding');
+    else urlMode.classList.add('load-hiding');
+    statusEl.style.display = 'block';
+    statusEl.classList.remove('expanded', 'live');
+    requestAnimationFrame(() => statusEl.classList.add('live'));
+  };
 
   const restoreInputs = () => {
     dropZone.classList.remove('load-hiding');
@@ -199,7 +209,6 @@ function startDownload(url) {
     tabsEl.classList.remove('load-hiding');
     urlMode.classList.remove('load-hiding');
     searchModeEl.classList.remove('load-hiding');
-    // Keep inactive mode hidden via display
     urlMode.style.display = searchActive ? 'none' : '';
     searchModeEl.style.display = searchActive ? '' : 'none';
     btn.disabled = false;
@@ -207,13 +216,12 @@ function startDownload(url) {
     btn.textContent = 'Load';
   };
 
-  // Disable inputs while loading
+  // Disable the button immediately so user can't double-submit, but keep UI visible
   btn.disabled = true;
   urlInput.disabled = true;
   btn.innerHTML = '<span class="spinner"></span>Loading…';
-  statusEl.style.display = 'block';
-  statusEl.classList.remove('expanded', 'live');
-  requestAnimationFrame(() => statusEl.classList.add('live'));
+
+  // Pre-populate the import card (hidden until confirmed)
   artEl.innerHTML = '🎵';
   titleEl.textContent = 'Connecting…';
   artistEl.textContent = '';
@@ -239,6 +247,7 @@ function startDownload(url) {
   });
 
   es.addEventListener('metadata', e => {
+    confirmAndShow();
     const d = JSON.parse(e.data);
     completedTitle = d.name || d.title || 'track';
     titleEl.textContent = completedTitle;
@@ -254,6 +263,7 @@ function startDownload(url) {
   });
 
   es.addEventListener('found', e => {
+    confirmAndShow();
     const d = JSON.parse(e.data);
     foundYouTubeUrl = d.youtube_url || foundYouTubeUrl;
     setImportStage(d.fallback
@@ -331,15 +341,21 @@ function startDownload(url) {
     es.close();
     let msg = 'Download failed';
     try { msg = JSON.parse(e.data).message; } catch {}
-    setImportStage('✗ ' + msg);
     toast('Error: ' + msg, 5000);
+    if (confirmed) hideImportStatus();
     restoreInputs();
   });
 
   es.onerror = () => {
     if (es.readyState === EventSource.CLOSED) return;
     es.close();
-    setImportStage('✗ Connection lost');
+    toast('Connection lost', 3000);
+    if (confirmed) hideImportStatus();
     restoreInputs();
   };
+
+  function hideImportStatus() {
+    statusEl.classList.remove('live', 'expanded');
+    setTimeout(() => { statusEl.style.display = 'none'; }, 350);
+  }
 }
