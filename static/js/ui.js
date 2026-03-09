@@ -5,7 +5,7 @@ import {
   currentPosition, getCtx,
   updatePlayBtn, updateLoopBtn,
   makeIR, applyEffects, rebuildPlayback,
-  applyVolume, updateMuteBtn,
+  applyVolume, updateMuteBtn, stopActiveSource,
 } from './audio.js';
 import { drawWaveform } from './waveform.js';
 import {
@@ -84,8 +84,7 @@ $id('endBtn').addEventListener('click', () => {
   if (state.source) {
     state.playing = false;
     beginBottomVisualizerFade();
-    try { state.source.stop(); state.source.disconnect(); } catch(e) {}
-    state.source = null;
+    stopActiveSource();
     updatePlayBtn();
     updateBottomVisualizerPlaybackState();
   }

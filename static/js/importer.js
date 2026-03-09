@@ -149,6 +149,15 @@ function escHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+const IMPORT_UI_STATE = {
+  IDLE: 'idle',
+  CONNECTING: 'connecting',
+  LOADING: 'loading',
+  PLAYLIST_PROGRESS: 'playlist-progress',
+  ERROR: 'error',
+  COMPLETE: 'complete',
+};
+
 // ── Shared SSE download flow ───────────────────────────────────
 function startDownload(url) {
   const btn = $id('urlLoadBtn');
@@ -188,10 +197,9 @@ function startDownload(url) {
   const searchModeEl = $id('searchMode');
   const searchActive = $id('tabSearch').classList.contains('active');
 
-  // Only show loading UI once we have confirmation it's real
   let confirmed = false;
 
-  const confirmAndShow = () => {
+  function showLoadingCardIfNeeded() {
     if (confirmed) return;
     confirmed = true;
     dropZone.classList.add('load-hiding');
@@ -202,9 +210,9 @@ function startDownload(url) {
     setDisplay(statusEl, 'block');
     statusEl.classList.remove('expanded', 'live');
     requestAnimationFrame(() => statusEl.classList.add('live'));
-  };
+  }
 
-  const restoreInputs = () => {
+  function restoreInputs() {
     dropZone.classList.remove('load-hiding');
     dividerEl.classList.remove('load-hiding');
     tabsEl.classList.remove('load-hiding');
@@ -214,26 +222,57 @@ function startDownload(url) {
     searchModeEl.style.display = searchActive ? '' : 'none';
     btn.disabled = false;
     urlInput.disabled = false;
-    btn.textContent = 'Load';
-  };
+    setText(btn, 'Load');
+  }
 
-  // Disable the button immediately so user can't double-submit, but keep UI visible
-  btn.disabled = true;
-  urlInput.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span>Loading…';
+  function hideImportStatus() {
+    statusEl.classList.remove('live', 'expanded');
+    setTimeout(() => { setDisplay(statusEl, 'none'); }, 350);
+  }
 
-  // Pre-populate the import card (hidden until confirmed)
-  artEl.innerHTML = '🎵';
-  setText(titleEl, 'Connecting…');
-  setText(artistEl, '');
-  setText(stageEl, '');
-  barEl.style.width = '0%';
-  trackProgEl.style.display = 'block';
-  trackListEl.style.display = 'block';
-  trackProgEl.classList.remove('visible');
-  trackListEl.classList.remove('visible');
-  trackListEl.innerHTML = '';
-  syncImportCardState();
+  function setImportUiState(nextState) {
+    if (nextState === IMPORT_UI_STATE.CONNECTING) {
+      btn.disabled = true;
+      urlInput.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>Loading…';
+      artEl.innerHTML = '🎵';
+      setText(titleEl, 'Connecting…');
+      setText(artistEl, '');
+      setText(stageEl, '');
+      barEl.style.width = '0%';
+      setDisplay(trackProgEl, 'block');
+      setDisplay(trackListEl, 'block');
+      trackProgEl.classList.remove('visible');
+      trackListEl.classList.remove('visible');
+      trackListEl.innerHTML = '';
+      syncImportCardState();
+      return;
+    }
+    if (nextState === IMPORT_UI_STATE.LOADING) {
+      showLoadingCardIfNeeded();
+      return;
+    }
+    if (nextState === IMPORT_UI_STATE.PLAYLIST_PROGRESS) {
+      toggleClass(trackProgEl, 'visible', true);
+      toggleClass(trackListEl, 'visible', true);
+      syncImportCardState();
+      return;
+    }
+    if (nextState === IMPORT_UI_STATE.COMPLETE) {
+      restoreInputs();
+      return;
+    }
+    if (nextState === IMPORT_UI_STATE.ERROR) {
+      if (confirmed) hideImportStatus();
+      restoreInputs();
+      return;
+    }
+    if (nextState === IMPORT_UI_STATE.IDLE) {
+      restoreInputs();
+    }
+  }
+
+  setImportUiState(IMPORT_UI_STATE.CONNECTING);
 
   let completedFile = null;
   let completedTitle = 'track';
@@ -248,7 +287,7 @@ function startDownload(url) {
   });
 
   es.addEventListener('metadata', e => {
-    confirmAndShow();
+    setImportUiState(IMPORT_UI_STATE.LOADING);
     const d = JSON.parse(e.data);
     completedTitle = d.name || d.title || 'track';
     setText(titleEl, completedTitle);
@@ -264,7 +303,7 @@ function startDownload(url) {
   });
 
   es.addEventListener('found', e => {
-    confirmAndShow();
+    setImportUiState(IMPORT_UI_STATE.LOADING);
     const d = JSON.parse(e.data);
     foundYouTubeUrl = d.youtube_url || foundYouTubeUrl;
     setImportStage(d.fallback
@@ -279,7 +318,7 @@ function startDownload(url) {
 
   es.addEventListener('track_start', e => {
     const d = JSON.parse(e.data);
-    trackProgEl.classList.add('visible');
+    setImportUiState(IMPORT_UI_STATE.PLAYLIST_PROGRESS);
     trackProgEl.textContent = `${d.artist} – ${d.title}`;
     barEl.style.width = '0%';
     const item = document.createElement('div');
@@ -334,7 +373,7 @@ function startDownload(url) {
       setImportStage('✗ ' + err.message);
       toast('Error: ' + err.message, 5000, 'error');
     } finally {
-      restoreInputs();
+      setImportUiState(IMPORT_UI_STATE.COMPLETE);
     }
   });
 
@@ -343,20 +382,13 @@ function startDownload(url) {
     let msg = 'Download failed';
     try { msg = JSON.parse(e.data).message; } catch {}
     toast('Error: ' + msg, 5000, 'error');
-    if (confirmed) hideImportStatus();
-    restoreInputs();
+    setImportUiState(IMPORT_UI_STATE.ERROR);
   });
 
   es.onerror = () => {
     if (es.readyState === EventSource.CLOSED) return;
     es.close();
     toast('Connection lost', 3000, 'error');
-    if (confirmed) hideImportStatus();
-    restoreInputs();
+    setImportUiState(IMPORT_UI_STATE.ERROR);
   };
-
-  function hideImportStatus() {
-    statusEl.classList.remove('live', 'expanded');
-    setTimeout(() => { setDisplay(statusEl, 'none'); }, 350);
-  }
 }

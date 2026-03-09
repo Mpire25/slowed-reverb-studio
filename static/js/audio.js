@@ -5,6 +5,31 @@ import {
   updateBottomVisualizerPlaybackState,
   startAnimLoop,
 } from './visualizer.js';
+import { $id } from './dom.js';
+
+function safeDisconnect(node) {
+  if (!node) return;
+  try { node.disconnect(); } catch (e) {}
+}
+
+export function stopActiveSource({ stopPlayback = true } = {}) {
+  if (!state.source) return;
+  const source = state.source;
+  state.source = null;
+  try { source.onended = null; } catch (e) {}
+  if (stopPlayback) {
+    try { source.stop(); } catch (e) {}
+  }
+  safeDisconnect(source);
+}
+
+export function resetAudioNodes() {
+  const keys = ['convolver', 'dryGain', 'wetGain', 'masterGain', 'merger', 'analyser'];
+  for (const key of keys) {
+    safeDisconnect(state[key]);
+    state[key] = null;
+  }
+}
 
 export function getCtx() {
   if (!state.audioCtx) {
@@ -27,13 +52,8 @@ export function makeIR(ctx, decay) {
 }
 
 export function buildPipeline(ctx) {
-  if (state.source) { try { state.source.disconnect(); } catch(e) {} }
-  if (state.convolver) { try { state.convolver.disconnect(); } catch(e) {} }
-  if (state.dryGain) { try { state.dryGain.disconnect(); } catch(e) {} }
-  if (state.wetGain) { try { state.wetGain.disconnect(); } catch(e) {} }
-  if (state.masterGain) { try { state.masterGain.disconnect(); } catch(e) {} }
-  if (state.merger) { try { state.merger.disconnect(); } catch(e) {} }
-  if (state.analyser) { try { state.analyser.disconnect(); } catch(e) {} }
+  safeDisconnect(state.source);
+  resetAudioNodes();
 
   const analyser = ctx.createAnalyser();
   analyser.fftSize = 2048;
@@ -61,13 +81,7 @@ export function buildPipeline(ctx) {
 }
 
 function createSource(ctx, offset) {
-  if (state.source) {
-    try {
-      state.source.onended = null;
-      state.source.stop();
-      state.source.disconnect();
-    } catch(e) {}
-  }
+  stopActiveSource();
   const src = ctx.createBufferSource();
   src.buffer = state.audioBuffer;
   src.playbackRate.value = state.speed;
@@ -116,9 +130,7 @@ export function pause() {
   state.playing = false;
   beginBottomVisualizerFade();
   updatePlayBtn();
-  try { state.source.stop(); } catch(e) {}
-  try { state.source.disconnect(); } catch(e) {}
-  state.source = null;
+  stopActiveSource();
   updateBottomVisualizerPlaybackState();
 }
 
@@ -144,7 +156,7 @@ export function applyVolume() {
 }
 
 export function updateMuteBtn() {
-  const btn = document.getElementById('muteBtn');
+  const btn = $id('muteBtn');
   if (!btn) return;
   const muted = state.muted || state.volume === 0;
   btn.setAttribute('aria-pressed', muted ? 'true' : 'false');
@@ -177,7 +189,7 @@ export function rebuildPlayback() {
 }
 
 export function updatePlayBtn() {
-  const icon = document.getElementById('playIcon');
+  const icon = $id('playIcon');
   if (state.playing) {
     icon.innerHTML = '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>';
   } else {
@@ -186,7 +198,7 @@ export function updatePlayBtn() {
 }
 
 export function updateLoopBtn() {
-  const btn = document.getElementById('loopBtn');
+  const btn = $id('loopBtn');
   btn.classList.toggle('active', state.loopEnabled);
   btn.setAttribute('aria-pressed', state.loopEnabled ? 'true' : 'false');
 }
