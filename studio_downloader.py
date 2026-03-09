@@ -15,17 +15,20 @@ from pathlib import Path
 
 import yt_dlp
 from mutagen.id3 import ID3, APIC, TIT2, TPE1, TALB, ID3NoHeaderError
+from backend_utils import clean_error_message
 
 STUDIO_DIR = Path(__file__).parent
 DOWNLOADS_DIR = STUDIO_DIR / "downloads"
 
-_ANSI_RE = re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
-_PREFIX_RE = re.compile(r'^(ERROR|WARNING):\s*(\[[^\]]+\]\s*)?', re.IGNORECASE)
+_ytmusic = None
 
-def _clean_error(msg: str) -> str:
-    msg = _ANSI_RE.sub('', msg).strip()
-    msg = msg.splitlines()[0].strip() if msg else msg
-    return _PREFIX_RE.sub('', msg).strip()
+
+def _get_ytmusic():
+    global _ytmusic
+    if _ytmusic is None:
+        from ytmusicapi import YTMusic
+        _ytmusic = YTMusic()
+    return _ytmusic
 
 # Load .env from studio directory
 _env_file = STUDIO_DIR / ".env"
@@ -203,7 +206,6 @@ def _score_result(result, expected_title, expected_artist, duration_s):
 
 def _find_youtube_id(track):
     """Search YouTube Music, fall back to YouTube search if confidence is low."""
-    from ytmusicapi import YTMusic
     query = f"{track['artist']} - {track['name']}"
     duration_s = track["duration_ms"] // 1000
 
@@ -213,7 +215,7 @@ def _find_youtube_id(track):
     any_title_match = False
 
     try:
-        ytm = YTMusic()
+        ytm = _get_ytmusic()
         results = ytm.search(query, filter="songs", limit=20)
         for result in results:
             score = _score_result(result, track["name"], track["artist"], duration_s)
@@ -430,7 +432,7 @@ def download_spotify(url, on_event):
             on_event("track_error", {
                 "index": i,
                 "title": track["name"],
-                "error": _clean_error(str(e)),
+                "error": clean_error_message(str(e)),
             })
 
     if not results:
