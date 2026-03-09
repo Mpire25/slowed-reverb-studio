@@ -135,7 +135,7 @@ updateVolumeTrack();
 
 // ─── Waveform scrubbing ──────────────────────────────────────────────────────
 (function() {
-  const canvas = document.getElementById('waveform');
+  const canvas = $id('waveform');
   let scrubbing = false;
   function doSeek(e) {
     const rect = canvas.getBoundingClientRect();
