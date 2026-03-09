@@ -2,7 +2,7 @@ import { state } from './state.js';
 import { loadFile, updateSourceImportUI } from './loader.js';
 import { SERVER } from './config.js';
 import { toast } from './utils.js';
-import { $id, setDisplay, setText, toggleClass } from './dom.js';
+import { $id, $ids, setDisplay, setText, toggleClass } from './dom.js';
 
 export function initImporter() {
   const btn = $id('urlLoadBtn');
@@ -43,25 +43,22 @@ export function initImporter() {
   });
 
   // ── Tab switching ──────────────────────────────────────────────
-  const tabUrl = $id('tabUrl');
-  const tabSearch = $id('tabSearch');
-  const urlMode = $id('urlMode');
-  const searchMode = $id('searchMode');
-  const searchInput = $id('searchInput');
+  const { tabUrl, tabSearch, urlMode, searchMode, searchInput } =
+    $ids(['tabUrl', 'tabSearch', 'urlMode', 'searchMode', 'searchInput']);
 
   tabUrl.addEventListener('click', () => {
     tabUrl.classList.add('active');
     tabSearch.classList.remove('active');
-    urlMode.style.display = '';
-    searchMode.style.display = 'none';
+    setDisplay(urlMode, '');
+    setDisplay(searchMode, 'none');
     urlInput.focus();
   });
 
   tabSearch.addEventListener('click', () => {
     tabSearch.classList.add('active');
     tabUrl.classList.remove('active');
-    searchMode.style.display = '';
-    urlMode.style.display = 'none';
+    setDisplay(searchMode, '');
+    setDisplay(urlMode, 'none');
     searchInput.focus();
   });
 
@@ -74,7 +71,7 @@ export function initImporter() {
     clearTimeout(searchTimer);
     const q = searchInput.value.trim();
     if (!q) {
-      resultsEl.style.display = 'none';
+      setDisplay(resultsEl, 'none');
       resultsEl.innerHTML = '';
       return;
     }
@@ -83,14 +80,14 @@ export function initImporter() {
 
   searchInput.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
-      resultsEl.style.display = 'none';
+      setDisplay(resultsEl, 'none');
       resultsEl.innerHTML = '';
     }
   });
 
   document.addEventListener('click', e => {
     if (!searchMode.contains(e.target)) {
-      resultsEl.style.display = 'none';
+      setDisplay(resultsEl, 'none');
     }
   });
 
@@ -99,7 +96,7 @@ export function initImporter() {
     searchAbort = new AbortController();
 
     resultsEl.innerHTML = '<div class="search-result-loading"><span class="spinner"></span></div>';
-    resultsEl.style.display = 'block';
+    setDisplay(resultsEl, 'block');
 
     try {
       const res = await fetch(`${SERVER}/api/search?q=${encodeURIComponent(q)}`, {
@@ -134,7 +131,7 @@ export function initImporter() {
         </div>
       `;
       el.addEventListener('click', () => {
-        resultsEl.style.display = 'none';
+        setDisplay(resultsEl, 'none');
         resultsEl.innerHTML = '';
         searchInput.value = '';
         const ytUrl = `https://music.youtube.com/watch?v=${item.videoId}`;
@@ -159,16 +156,29 @@ const IMPORT_UI_STATE = {
 
 // ── Shared SSE download flow ───────────────────────────────────
 function startDownload(url) {
-  const btn = $id('urlLoadBtn');
-  const urlInput = $id('urlInput');
-  const statusEl = $id('importStatus');
-  const artEl = $id('importArt');
-  const titleEl = $id('importTitle');
-  const artistEl = $id('importArtist');
-  const stageEl = $id('importStage');
-  const barEl = $id('importBar');
-  const trackProgEl = $id('importTrackProgress');
-  const trackListEl = $id('importTrackList');
+  const {
+    urlLoadBtn: btn,
+    urlInput,
+    importStatus: statusEl,
+    importArt: artEl,
+    importTitle: titleEl,
+    importArtist: artistEl,
+    importStage: stageEl,
+    importBar: barEl,
+    importTrackProgress: trackProgEl,
+    importTrackList: trackListEl,
+  } = $ids([
+    'urlLoadBtn',
+    'urlInput',
+    'importStatus',
+    'importArt',
+    'importTitle',
+    'importArtist',
+    'importStage',
+    'importBar',
+    'importTrackProgress',
+    'importTrackList',
+  ]);
   let stageSwapTimer = null;
 
   const setImportStage = (text) => {
@@ -217,8 +227,8 @@ function startDownload(url) {
     tabsEl.classList.remove('load-hiding');
     urlMode.classList.remove('load-hiding');
     searchModeEl.classList.remove('load-hiding');
-    urlMode.style.display = searchActive ? 'none' : '';
-    searchModeEl.style.display = searchActive ? '' : 'none';
+    setDisplay(urlMode, searchActive ? 'none' : '');
+    setDisplay(searchModeEl, searchActive ? '' : 'none');
     btn.disabled = false;
     urlInput.disabled = false;
     setText(btn, 'Load');

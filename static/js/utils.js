@@ -1,4 +1,5 @@
 import { state, MIN_SPEED, MAX_SPEED } from './state.js';
+import { $id } from './dom.js';
 
 export function clampSpeed(speed) {
   return Math.min(MAX_SPEED, Math.max(MIN_SPEED, speed));
@@ -27,7 +28,7 @@ export function sanitize(s) {
 }
 
 export function toast(msg, ms = 3000, type = 'info') {
-  const el = document.getElementById('toast');
+  const el = $id('toast');
   el.textContent = msg;
   el.className = `toast toast-${type} show`;
   clearTimeout(el._t);

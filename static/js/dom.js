@@ -13,6 +13,11 @@ export function $ids(ids) {
   return out;
 }
 
+export function setHtml(el, value) {
+  if (!el) return;
+  el.innerHTML = value;
+}
+
 export function toggleClass(el, cls, on) {
   if (!el) return;
   el.classList.toggle(cls, !!on);

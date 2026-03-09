@@ -1,6 +1,7 @@
 import { state, MIN_SPEED, MAX_SPEED } from './state.js';
 import { drawWaveform } from './waveform.js';
 import { fmt } from './utils.js';
+import { $id, setText } from './dom.js';
 
 export const VISUALIZER_FADE_OUT_MS = 420;
 export const VISUALIZER_FADE_CURVE = 1.45;
@@ -32,12 +33,12 @@ export function beginBottomVisualizerFade() {
 }
 
 export function updateBottomVisualizerVisibility() {
-  const canvas = document.getElementById('bottomVisualizer');
+  const canvas = $id('bottomVisualizer');
   canvas.classList.toggle('off', !state.visualizerEnabled);
 }
 
 export function updateBottomVisualizerPlaybackState() {
-  const canvas = document.getElementById('bottomVisualizer');
+  const canvas = $id('bottomVisualizer');
   const active = state.visualizerEnabled && !!state.audioBuffer;
   canvas.classList.toggle('active', active);
 }
@@ -57,7 +58,7 @@ const VISUALIZER_TUNING = {
 };
 
 export function drawBottomVisualizer(clearOnly = false) {
-  const canvas = document.getElementById('bottomVisualizer');
+  const canvas = $id('bottomVisualizer');
   const dpr = window.devicePixelRatio || 1;
   const W = canvas.offsetWidth;
   const H = canvas.offsetHeight;
@@ -248,7 +249,7 @@ export function updateTimeDisplay() {
       : Math.min((state.audioCtx.currentTime - state.startTime) * state.speed, state.duration);
   const dispPos = state.speed ? rawPos / state.speed : 0;
   const dispDur = (state.duration && state.speed) ? state.duration / state.speed : 0;
-  document.getElementById('timeDisplay').textContent = `${fmt(dispPos)} / ${fmt(dispDur)}`;
+  setText($id('timeDisplay'), `${fmt(dispPos)} / ${fmt(dispDur)}`);
 }
 
 export function startAnimLoop() {
