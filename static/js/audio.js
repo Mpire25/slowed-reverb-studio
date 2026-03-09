@@ -31,6 +31,7 @@ export function buildPipeline(ctx) {
   if (state.convolver) { try { state.convolver.disconnect(); } catch(e) {} }
   if (state.dryGain) { try { state.dryGain.disconnect(); } catch(e) {} }
   if (state.wetGain) { try { state.wetGain.disconnect(); } catch(e) {} }
+  if (state.masterGain) { try { state.masterGain.disconnect(); } catch(e) {} }
   if (state.merger) { try { state.merger.disconnect(); } catch(e) {} }
   if (state.analyser) { try { state.analyser.disconnect(); } catch(e) {} }
 
@@ -39,20 +40,24 @@ export function buildPipeline(ctx) {
   const dryGain = ctx.createGain();
   const wetGain = ctx.createGain();
   const convolver = ctx.createConvolver();
+  const masterGain = ctx.createGain();
 
   dryGain.gain.value = 1 - state.reverbMix;
   wetGain.gain.value = state.reverbMix;
   convolver.buffer = makeIR(ctx, state.reverbDecay);
+  masterGain.gain.value = state.muted ? 0 : state.volume;
 
   dryGain.connect(analyser);
   convolver.connect(wetGain);
   wetGain.connect(analyser);
-  analyser.connect(ctx.destination);
+  analyser.connect(masterGain);
+  masterGain.connect(ctx.destination);
 
   state.analyser = analyser;
   state.dryGain = dryGain;
   state.wetGain = wetGain;
   state.convolver = convolver;
+  state.masterGain = masterGain;
 }
 
 function createSource(ctx, offset) {
@@ -131,6 +136,33 @@ export function applyEffects() {
   if (!state.playing || !state.dryGain) return;
   state.dryGain.gain.value = 1 - state.reverbMix;
   state.wetGain.gain.value = state.reverbMix;
+}
+
+export function applyVolume() {
+  if (!state.masterGain) return;
+  state.masterGain.gain.value = state.muted ? 0 : state.volume;
+}
+
+export function updateMuteBtn() {
+  const btn = document.getElementById('muteBtn');
+  if (!btn) return;
+  const muted = state.muted || state.volume === 0;
+  btn.setAttribute('aria-pressed', muted ? 'true' : 'false');
+  btn.title = muted ? 'Unmute' : 'Mute';
+  btn.innerHTML = muted
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 5L6 9H2v6h4l5 4V5z" fill="currentColor" stroke="none"/>
+        <line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
+       </svg>`
+    : state.volume < 0.4
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 5L6 9H2v6h4l5 4V5z" fill="currentColor" stroke="none"/>
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+       </svg>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M11 5L6 9H2v6h4l5 4V5z" fill="currentColor" stroke="none"/>
+        <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+       </svg>`;
 }
 
 export function rebuildPlayback() {

@@ -192,6 +192,8 @@ header{display:flex;align-items:center;justify-content:space-between;max-width:1
 .transport-icon-btn svg{width:18px;height:18px}
 .loop-btn.active{color:var(--text)}
 .time-display{font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.volume-control{display:flex;align-items:center;gap:4px;margin-left:auto}
+.volume-slider{width:80px;flex:none}
 
 /* ── Effects ── */
 .effects{margin-bottom:24px}
