@@ -150,7 +150,6 @@ function escHtml(str) {
 }
 
 const IMPORT_UI_STATE = {
-  IDLE: 'idle',
   CONNECTING: 'connecting',
   LOADING: 'loading',
   PLAYLIST_PROGRESS: 'playlist-progress',

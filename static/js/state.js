@@ -12,7 +12,6 @@ export const state = {
   wetGain: null,
   convolver: null,
   masterGain: null,
-  merger: null,
   volume: 1,
   muted: false,
   startTime: 0,       // audioCtx.currentTime when playback started

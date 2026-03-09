@@ -24,7 +24,7 @@ export function stopActiveSource({ stopPlayback = true } = {}) {
 }
 
 export function resetAudioNodes() {
-  const keys = ['convolver', 'dryGain', 'wetGain', 'masterGain', 'merger', 'analyser'];
+  const keys = ['convolver', 'dryGain', 'wetGain', 'masterGain', 'analyser'];
   for (const key of keys) {
     safeDisconnect(state[key]);
     state[key] = null;
