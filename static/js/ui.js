@@ -1,5 +1,5 @@
 import { state, settings } from './state.js';
-import { clampSpeed, getExportSuffix, sanitize, toast } from './utils.js';
+import { clampSpeed, getExportSuffix, sanitize } from './utils.js';
 import {
   play, pause, seekTo,
   currentPosition, getCtx,
@@ -17,9 +17,16 @@ import {
 } from './visualizer.js';
 import { handleFileObject, resetStudio, updateSourceImportUI } from './loader.js';
 import { initImporter } from './importer.js';
-import { doExport, closeModal, setProgress } from './exporter.js';
+import { doExport, closeModal } from './exporter.js';
 import { loadSettings, saveSettings, syncSettingsUI } from './settings.js';
 import { applyThemeFromCurrentTrack } from './theme.js';
+import { $id, setText, toggleClass } from './dom.js';
+import {
+  syncSpeedControls,
+  syncReverbControls,
+  syncDecayControls,
+  syncLoopButtonTitle,
+} from './controls.js';
 
 // ─── Init ────────────────────────────────────────────────────────────────────
 loadSettings();
@@ -27,7 +34,7 @@ syncSettingsUI();
 initImporter();
 
 // ─── Effect Sliders ──────────────────────────────────────────────────────────
-document.getElementById('speedSlider').addEventListener('input', e => {
+$id('speedSlider').addEventListener('input', e => {
   const nextSpeed = e.target.value / 100;
   if (state.playing && state.audioCtx) {
     const pos = currentPosition();
@@ -36,20 +43,20 @@ document.getElementById('speedSlider').addEventListener('input', e => {
   } else {
     state.speed = nextSpeed;
   }
-  document.getElementById('speedVal').textContent = state.speed.toFixed(2) + '×';
+  syncSpeedControls(state.speed);
   if (state.source) state.source.playbackRate.value = state.speed;
   updateTimeDisplay();
 });
 
-document.getElementById('reverbSlider').addEventListener('input', e => {
+$id('reverbSlider').addEventListener('input', e => {
   state.reverbMix = e.target.value / 100;
-  document.getElementById('reverbVal').textContent = e.target.value + '%';
+  syncReverbControls(state.reverbMix);
   applyEffects();
 });
 
-document.getElementById('decaySlider').addEventListener('input', e => {
+$id('decaySlider').addEventListener('input', e => {
   state.reverbDecay = e.target.value / 10;
-  document.getElementById('decayVal').textContent = state.reverbDecay.toFixed(1) + 's';
+  syncDecayControls(state.reverbDecay);
   if (state.playing) rebuildPlayback();
   else if (state.convolver) {
     const ctx = getCtx();
@@ -58,20 +65,20 @@ document.getElementById('decaySlider').addEventListener('input', e => {
 });
 
 // ─── Transport Controls ──────────────────────────────────────────────────────
-document.getElementById('playBtn').addEventListener('click', () => {
+$id('playBtn').addEventListener('click', () => {
   if (!state.audioBuffer) return;
   if (state.playing) pause();
   else play();
 });
 
-document.getElementById('startBtn').addEventListener('click', () => {
+$id('startBtn').addEventListener('click', () => {
   if (!state.audioBuffer) return;
   seekTo(0);
   drawWaveform();
   updateTimeDisplay();
 });
 
-document.getElementById('endBtn').addEventListener('click', () => {
+$id('endBtn').addEventListener('click', () => {
   if (!state.audioBuffer) return;
   state.pausedAt = state.duration;
   if (state.source) {
@@ -86,7 +93,7 @@ document.getElementById('endBtn').addEventListener('click', () => {
   updateTimeDisplay();
 });
 
-document.getElementById('loopBtn').addEventListener('click', () => {
+$id('loopBtn').addEventListener('click', () => {
   const wasLooping = state.loopEnabled;
   const loopPos = wasLooping ? currentPosition() : 0;
   state.loopEnabled = !state.loopEnabled;
@@ -97,24 +104,24 @@ document.getElementById('loopBtn').addEventListener('click', () => {
   }
   if (state.source) state.source.loop = state.loopEnabled;
   updateLoopBtn();
-  document.getElementById('loopBtn').title = state.loopEnabled ? 'Loop On' : 'Loop Off';
+  syncLoopButtonTitle(state.loopEnabled);
 });
 
 // ─── Volume Control ──────────────────────────────────────────────────────────
 function updateVolumeTrack() {
-  const slider = document.getElementById('volumeSlider');
+  const slider = $id('volumeSlider');
   const pct = state.muted ? 0 : Math.round(state.volume * 100);
   slider.style.background = `linear-gradient(to right, var(--accent1) 0%, var(--accent2) ${pct}%, var(--border) ${pct}%)`;
 }
 
-document.getElementById('muteBtn').addEventListener('click', () => {
+$id('muteBtn').addEventListener('click', () => {
   state.muted = !state.muted;
   applyVolume();
   updateMuteBtn();
   updateVolumeTrack();
 });
 
-document.getElementById('volumeSlider').addEventListener('input', e => {
+$id('volumeSlider').addEventListener('input', e => {
   state.volume = e.target.value / 100;
   if (state.muted && state.volume > 0) {
     state.muted = false;
@@ -123,7 +130,7 @@ document.getElementById('volumeSlider').addEventListener('input', e => {
   updateMuteBtn();
   updateVolumeTrack();
 });
-document.getElementById('volumeSlider').addEventListener('pointerup', e => e.target.blur());
+$id('volumeSlider').addEventListener('pointerup', e => e.target.blur());
 
 updateVolumeTrack();
 
@@ -147,8 +154,8 @@ updateVolumeTrack();
 })();
 
 // ─── File Drop / Pick ────────────────────────────────────────────────────────
-const dropZone = document.getElementById('dropZone');
-const fileInput = document.getElementById('fileInput');
+const dropZone = $id('dropZone');
+const fileInput = $id('fileInput');
 
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
@@ -166,75 +173,72 @@ fileInput.addEventListener('change', e => {
 });
 
 // ─── New Song ────────────────────────────────────────────────────────────────
-document.getElementById('newSongBtn').addEventListener('click', resetStudio);
+$id('newSongBtn').addEventListener('click', resetStudio);
 
 // ─── Export Modal ────────────────────────────────────────────────────────────
-document.getElementById('downloadBtn').addEventListener('click', () => {
+$id('downloadBtn').addEventListener('click', () => {
   if (!state.audioBuffer) return;
   const title = state.title;
   const suffix = getExportSuffix();
   const artist = state.artist;
   const suggested = sanitize(`${artist} - ${title}${suffix}`) + '.mp3';
-  document.getElementById('filenameInput').value = suggested;
-  document.getElementById('progressWrap').style.display = 'none';
-  document.getElementById('progressBar').style.width = '0%';
-  document.getElementById('modalConfirm').disabled = false;
-  document.getElementById('modalConfirm').textContent = 'Export';
-  document.getElementById('modalOverlay').classList.add('open');
-  document.getElementById('filenameInput').focus();
-  document.getElementById('filenameInput').select();
+  $id('filenameInput').value = suggested;
+  $id('progressWrap').style.display = 'none';
+  $id('progressBar').style.width = '0%';
+  $id('modalConfirm').disabled = false;
+  setText($id('modalConfirm'), 'Export');
+  toggleClass($id('modalOverlay'), 'open', true);
+  $id('filenameInput').focus();
+  $id('filenameInput').select();
 });
 
-document.getElementById('modalCancel').addEventListener('click', closeModal);
-document.getElementById('modalOverlay').addEventListener('click', e => {
-  if (e.target === document.getElementById('modalOverlay')) closeModal();
+$id('modalCancel').addEventListener('click', closeModal);
+$id('modalOverlay').addEventListener('click', e => {
+  if (e.target === $id('modalOverlay')) closeModal();
 });
-document.getElementById('modalConfirm').addEventListener('click', async () => {
-  const filename = document.getElementById('filenameInput').value.trim() || 'track.mp3';
+$id('modalConfirm').addEventListener('click', async () => {
+  const filename = $id('filenameInput').value.trim() || 'track.mp3';
   await doExport(filename);
 });
 
 // ─── Settings Panel ──────────────────────────────────────────────────────────
-document.getElementById('gearBtn').addEventListener('click', () => {
-  document.getElementById('settingsPanel').classList.add('open');
-  document.getElementById('overlay').classList.add('open');
+$id('gearBtn').addEventListener('click', () => {
+  toggleClass($id('settingsPanel'), 'open', true);
+  toggleClass($id('overlay'), 'open', true);
 });
 function closeSettings() {
-  document.getElementById('settingsPanel').classList.remove('open');
-  document.getElementById('overlay').classList.remove('open');
+  toggleClass($id('settingsPanel'), 'open', false);
+  toggleClass($id('overlay'), 'open', false);
 }
-document.getElementById('closeSettings').addEventListener('click', closeSettings);
-document.getElementById('overlay').addEventListener('click', closeSettings);
+$id('closeSettings').addEventListener('click', closeSettings);
+$id('overlay').addEventListener('click', closeSettings);
 
-document.getElementById('defaultSpeed').addEventListener('change', e => {
+$id('defaultSpeed').addEventListener('change', e => {
   settings.defaultSpeed = clampSpeed(+e.target.value);
   e.target.value = settings.defaultSpeed;
   saveSettings();
   if (!state.audioBuffer) {
     state.speed = settings.defaultSpeed;
-    document.getElementById('speedSlider').value = Math.round(settings.defaultSpeed * 100);
-    document.getElementById('speedVal').textContent = settings.defaultSpeed.toFixed(2) + '×';
+    syncSpeedControls(settings.defaultSpeed);
   }
 });
-document.getElementById('defaultReverb').addEventListener('change', e => {
+$id('defaultReverb').addEventListener('change', e => {
   settings.defaultReverb = +e.target.value;
   saveSettings();
   if (!state.audioBuffer) {
     state.reverbMix = settings.defaultReverb / 100;
-    document.getElementById('reverbSlider').value = settings.defaultReverb;
-    document.getElementById('reverbVal').textContent = settings.defaultReverb + '%';
+    syncReverbControls(state.reverbMix);
   }
 });
-document.getElementById('defaultDecay').addEventListener('change', e => {
+$id('defaultDecay').addEventListener('change', e => {
   settings.defaultDecay = +e.target.value;
   saveSettings();
   if (!state.audioBuffer) {
     state.reverbDecay = settings.defaultDecay;
-    document.getElementById('decaySlider').value = Math.round(settings.defaultDecay * 10);
-    document.getElementById('decayVal').textContent = settings.defaultDecay.toFixed(1) + 's';
+    syncDecayControls(settings.defaultDecay);
   }
 });
-document.getElementById('bottomVisualizerToggle').addEventListener('change', e => {
+$id('bottomVisualizerToggle').addEventListener('change', e => {
   settings.visualizerEnabled = e.target.checked;
   state.visualizerEnabled = settings.visualizerEnabled;
   saveSettings();
@@ -242,7 +246,7 @@ document.getElementById('bottomVisualizerToggle').addEventListener('change', e =
   updateBottomVisualizerPlaybackState();
   drawBottomVisualizer(!state.playing);
 });
-document.getElementById('artThemeToggle').addEventListener('change', e => {
+$id('artThemeToggle').addEventListener('change', e => {
   settings.artThemeEnabled = e.target.checked;
   saveSettings();
   void applyThemeFromCurrentTrack();

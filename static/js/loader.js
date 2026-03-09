@@ -9,13 +9,14 @@ import {
 } from './visualizer.js';
 import { applyThemeFromCurrentTrack } from './theme.js';
 import { toast, fmt } from './utils.js';
+import { $id, toggleClass, setDisplay, setText } from './dom.js';
 
 export function updateTrackUI() {
-  document.getElementById('trackTitle').textContent = state.title;
-  document.getElementById('trackArtist').textContent = state.artist;
-  document.getElementById('trackDuration').textContent = fmt(state.duration);
-  const spotifyLinkEl = document.getElementById('trackSpotifyLink');
-  const youTubeLinkEl = document.getElementById('trackYouTubeLink');
+  setText($id('trackTitle'), state.title);
+  setText($id('trackArtist'), state.artist);
+  setText($id('trackDuration'), fmt(state.duration));
+  const spotifyLinkEl = $id('trackSpotifyLink');
+  const youTubeLinkEl = $id('trackYouTubeLink');
   if (state.sourceSpotifyUrl) {
     spotifyLinkEl.href = state.sourceSpotifyUrl;
     spotifyLinkEl.classList.remove('hidden');
@@ -29,7 +30,7 @@ export function updateTrackUI() {
     youTubeLinkEl.classList.add('hidden');
   }
 
-  const artEl = document.getElementById('albumArt');
+  const artEl = $id('albumArt');
   artEl.innerHTML = '';
   const placeholderEl = document.createElement('span');
   placeholderEl.className = 'album-art-placeholder';
@@ -54,9 +55,9 @@ export function updateTrackUI() {
 export function showPlayerUI(show) {
   const els = ['trackCard', 'waveformWrap', 'transport', 'effects', 'downloadBtn'];
   els.forEach(id => {
-    document.getElementById(id).classList.toggle('hidden', !show);
+    toggleClass($id(id), 'hidden', !show);
   });
-  document.getElementById('newSongBtn').classList.toggle('hidden', !show);
+  toggleClass($id('newSongBtn'), 'hidden', !show);
   if (show) {
     drawWaveform();
     drawBottomVisualizer(!state.playing);
@@ -66,13 +67,13 @@ export function showPlayerUI(show) {
 }
 
 export function showLoading(on) {
-  document.getElementById('downloadBtn').disabled = on;
+  $id('downloadBtn').disabled = on;
 }
 
 export function updateSourceImportUI() {
   const hasTrack = !!state.audioBuffer;
-  document.getElementById('dropZone').style.display = hasTrack ? 'none' : 'block';
-  document.getElementById('urlRow').style.display = (!hasTrack && state.serverOnline) ? 'block' : 'none';
+  setDisplay($id('dropZone'), hasTrack ? 'none' : 'block');
+  setDisplay($id('urlRow'), (!hasTrack && state.serverOnline) ? 'block' : 'none');
 }
 
 export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceLinks = null } = {}) {
@@ -155,9 +156,9 @@ export function resetStudio() {
   state.artBytes = null;
   state.artMime = 'image/jpeg';
 
-  const urlInput = document.getElementById('urlInput');
+  const urlInput = $id('urlInput');
   if (urlInput) urlInput.value = '';
-  const statusEl = document.getElementById('importStatus');
+  const statusEl = $id('importStatus');
   if (statusEl) statusEl.style.display = 'none';
 
   showPlayerUI(false);

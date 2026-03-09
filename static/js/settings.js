@@ -1,6 +1,13 @@
 import { state, settings, SETTINGS_STORAGE_KEY } from './state.js';
 import { clampSpeed } from './utils.js';
 import { setThemeCss } from './theme.js';
+import { $id } from './dom.js';
+import {
+  syncSpeedControls,
+  syncReverbControls,
+  syncDecayControls,
+  syncLoopButtonTitle,
+} from './controls.js';
 import {
   updateBottomVisualizerVisibility,
   updateBottomVisualizerPlaybackState,
@@ -34,11 +41,11 @@ export function saveSettings() {
 }
 
 export function syncSettingsUI() {
-  document.getElementById('defaultSpeed').value = settings.defaultSpeed;
-  document.getElementById('defaultReverb').value = settings.defaultReverb;
-  document.getElementById('defaultDecay').value = settings.defaultDecay;
-  document.getElementById('bottomVisualizerToggle').checked = settings.visualizerEnabled;
-  document.getElementById('artThemeToggle').checked = settings.artThemeEnabled;
+  $id('defaultSpeed').value = settings.defaultSpeed;
+  $id('defaultReverb').value = settings.defaultReverb;
+  $id('defaultDecay').value = settings.defaultDecay;
+  $id('bottomVisualizerToggle').checked = settings.visualizerEnabled;
+  $id('artThemeToggle').checked = settings.artThemeEnabled;
 
   settings.defaultSpeed = clampSpeed(settings.defaultSpeed);
   state.speed = settings.defaultSpeed;
@@ -48,14 +55,11 @@ export function syncSettingsUI() {
   state.visualizerEnabled = settings.visualizerEnabled;
   setThemeCss(state.themeCurrent);
 
-  document.getElementById('speedSlider').value = Math.round(state.speed * 100);
-  document.getElementById('speedVal').textContent = state.speed.toFixed(2) + '×';
-  document.getElementById('reverbSlider').value = Math.round(state.reverbMix * 100);
-  document.getElementById('reverbVal').textContent = Math.round(state.reverbMix * 100) + '%';
-  document.getElementById('decaySlider').value = Math.round(state.reverbDecay * 10);
-  document.getElementById('decayVal').textContent = state.reverbDecay.toFixed(1) + 's';
+  syncSpeedControls(state.speed);
+  syncReverbControls(state.reverbMix);
+  syncDecayControls(state.reverbDecay);
   updateLoopBtn();
-  document.getElementById('loopBtn').title = state.loopEnabled ? 'Loop On' : 'Loop Off';
+  syncLoopButtonTitle(state.loopEnabled);
   updateBottomVisualizerVisibility();
   updateBottomVisualizerPlaybackState();
   drawBottomVisualizer(!state.playing);
