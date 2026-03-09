@@ -66,8 +66,11 @@ When the backend is running, a URL import field appears below the drop zone. Pas
 slowed-reverb-studio/
   server.py             — Flask backend + static file serving (port 7337)
   studio_downloader.py  — integrated download engine (YouTube + Spotify)
+  backend_utils.py      — shared backend helpers (error cleanup, formatting)
   requirements.txt
   downloads/            — imported MP3s saved here
+  tests/
+    test_backend.py     — backend unit tests (helpers + route guards)
   static/
     index.html          — app shell (HTML structure only)
     style.css           — all styles
@@ -81,6 +84,8 @@ slowed-reverb-studio/
       importer.js       — SSE import flow
       exporter.js       — MP3 export
       settings.js       — settings persistence
+      controls.js       — shared slider/loop UI sync helpers
+      dom.js            — cached DOM lookup + UI utilities
       theme.js          — color extraction + CSS theming
       id3.js            — ID3v2 reader/writer
       state.js          — shared state + settings objects
