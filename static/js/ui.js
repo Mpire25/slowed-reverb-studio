@@ -5,6 +5,7 @@ import {
   currentPosition, getCtx,
   updatePlayBtn, updateLoopBtn,
   makeIR, applyEffects, rebuildPlayback,
+  applyVolume, updateMuteBtn,
 } from './audio.js';
 import { drawWaveform } from './waveform.js';
 import {
@@ -97,6 +98,22 @@ document.getElementById('loopBtn').addEventListener('click', () => {
   if (state.source) state.source.loop = state.loopEnabled;
   updateLoopBtn();
   document.getElementById('loopBtn').title = state.loopEnabled ? 'Loop On' : 'Loop Off';
+});
+
+// ─── Volume Control ──────────────────────────────────────────────────────────
+document.getElementById('muteBtn').addEventListener('click', () => {
+  state.muted = !state.muted;
+  applyVolume();
+  updateMuteBtn();
+});
+
+document.getElementById('volumeSlider').addEventListener('input', e => {
+  state.volume = e.target.value / 100;
+  if (state.muted && state.volume > 0) {
+    state.muted = false;
+  }
+  applyVolume();
+  updateMuteBtn();
 });
 
 // ─── Waveform scrubbing ──────────────────────────────────────────────────────

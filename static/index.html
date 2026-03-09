@@ -142,6 +142,15 @@
       </svg>
     </button>
     <span class="time-display" id="timeDisplay">0:00 / 0:00</span>
+    <div class="volume-control">
+      <button class="transport-icon-btn" id="muteBtn" title="Mute" aria-label="Toggle Mute" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 5L6 9H2v6h4l5 4V5z" fill="currentColor" stroke="none"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+        </svg>
+      </button>
+      <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="100" step="1" aria-label="Volume">
+    </div>
   </div>
 
   <!-- Effects -->
