@@ -2,20 +2,21 @@ import { state } from './state.js';
 import { makeIR } from './audio.js';
 import { buildID3Tag } from './id3.js';
 import { getExportSuffix, sanitize, toast } from './utils.js';
+import { $id, setDisplay, toggleClass, setHtml } from './dom.js';
 
 export function closeModal() {
-  document.getElementById('modalOverlay').classList.remove('open');
+  toggleClass($id('modalOverlay'), 'open', false);
 }
 
 export function setProgress(pct) {
-  document.getElementById('progressBar').style.width = pct + '%';
+  $id('progressBar').style.width = pct + '%';
 }
 
 export async function doExport(filename) {
-  const confirmBtn = document.getElementById('modalConfirm');
+  const confirmBtn = $id('modalConfirm');
   confirmBtn.disabled = true;
-  confirmBtn.innerHTML = '<span class="spinner"></span>Rendering…';
-  document.getElementById('progressWrap').style.display = 'block';
+  setHtml(confirmBtn, '<span class="spinner"></span>Rendering…');
+  setDisplay($id('progressWrap'), 'block');
   setProgress(0);
 
   try {
