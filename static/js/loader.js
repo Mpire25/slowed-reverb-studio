@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { readID3 } from './id3.js';
-import { loadAudioBuffer, play, updatePlayBtn } from './audio.js';
+import { loadAudioBuffer, play, updatePlayBtn, stopActiveSource, resetAudioNodes } from './audio.js';
 import { buildWaveformData, drawWaveform } from './waveform.js';
 import {
   clearBottomVisualizerFade,
@@ -101,7 +101,7 @@ export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceL
     state.pausedAt = 0;
     state.playing = false;
     clearBottomVisualizerFade();
-    if (state.source) { try { state.source.stop(); } catch(e) {} state.source = null; }
+    stopActiveSource();
 
     state.waveformData = buildWaveformData(buf);
     state.sourceSpotifyUrl = sourceLinks?.spotify || null;
@@ -128,15 +128,8 @@ export function handleFileObject(file) {
 }
 
 export function resetStudio() {
-  if (state.source) {
-    try { state.source.stop(); } catch(e) {}
-    try { state.source.disconnect(); } catch(e) {}
-    state.source = null;
-  }
-  if (state.convolver) { try { state.convolver.disconnect(); } catch(e) {} state.convolver = null; }
-  if (state.dryGain) { try { state.dryGain.disconnect(); } catch(e) {} state.dryGain = null; }
-  if (state.wetGain) { try { state.wetGain.disconnect(); } catch(e) {} state.wetGain = null; }
-  if (state.analyser) { try { state.analyser.disconnect(); } catch(e) {} state.analyser = null; }
+  stopActiveSource();
+  resetAudioNodes();
   if (state.artBlob) { URL.revokeObjectURL(state.artBlob); state.artBlob = null; }
 
   state.audioBuffer = null;
