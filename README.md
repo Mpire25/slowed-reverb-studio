@@ -50,7 +50,9 @@ Then open **`http://localhost:7337`** in your browser.
 3. Hit play to preview
 4. Click **Download MP3** → confirm the filename → exports with correct ID3 tags (title, artist, album art). The suggested name auto-adds `Slowed`/`Sped Up` and `Reverb` only when those effects are active.
 
-Keyboard shortcut: `Space` to play/pause. Click the waveform to seek.
+Keyboard shortcuts: `Space` to play/pause, `M` to toggle mute, `Shift+N` to reset/load a new track. Click the waveform to seek.
+
+The transport bar includes a **mute button** and **volume slider** for quick level control.
 
 The gear icon (top right) opens settings to change default slider values.
 
