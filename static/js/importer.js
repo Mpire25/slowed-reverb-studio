@@ -266,9 +266,6 @@ function startDownload(url) {
       restoreInputs();
       return;
     }
-    if (nextState === IMPORT_UI_STATE.IDLE) {
-      restoreInputs();
-    }
   }
 
   setImportUiState(IMPORT_UI_STATE.CONNECTING);
