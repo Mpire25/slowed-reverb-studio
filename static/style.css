@@ -229,6 +229,10 @@ input[type=range]::-webkit-slider-thumb{
 input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.2)}
 input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;border:none;
   background:linear-gradient(135deg,var(--accent1),var(--accent2));cursor:pointer}
+.volume-slider::-webkit-slider-thumb{-webkit-appearance:none;width:7px;height:7px;opacity:0;transition:opacity .15s;transform:none!important}
+.volume-slider:hover::-webkit-slider-thumb{opacity:1}
+.volume-slider::-moz-range-thumb{width:7px;height:7px;opacity:0;transition:opacity .15s}
+.volume-slider:hover::-moz-range-thumb{opacity:1}
 
 /* ── Download ── */
 .download-btn{

@@ -101,10 +101,17 @@ document.getElementById('loopBtn').addEventListener('click', () => {
 });
 
 // ─── Volume Control ──────────────────────────────────────────────────────────
+function updateVolumeTrack() {
+  const slider = document.getElementById('volumeSlider');
+  const pct = state.muted ? 0 : Math.round(state.volume * 100);
+  slider.style.background = `linear-gradient(to right, var(--accent1) 0%, var(--accent2) ${pct}%, var(--border) ${pct}%)`;
+}
+
 document.getElementById('muteBtn').addEventListener('click', () => {
   state.muted = !state.muted;
   applyVolume();
   updateMuteBtn();
+  updateVolumeTrack();
 });
 
 document.getElementById('volumeSlider').addEventListener('input', e => {
@@ -114,7 +121,11 @@ document.getElementById('volumeSlider').addEventListener('input', e => {
   }
   applyVolume();
   updateMuteBtn();
+  updateVolumeTrack();
 });
+document.getElementById('volumeSlider').addEventListener('pointerup', e => e.target.blur());
+
+updateVolumeTrack();
 
 // ─── Waveform scrubbing ──────────────────────────────────────────────────────
 (function() {
