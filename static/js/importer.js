@@ -2,7 +2,7 @@ import { state } from './state.js';
 import { loadFile, updateSourceImportUI } from './loader.js';
 import { SERVER } from './config.js';
 import { toast } from './utils.js';
-import { $id, $ids, setDisplay, setText, toggleClass } from './dom.js';
+import { $id, $ids, setDisplay, setText, toggleClass, SPINNER_HTML, spinnerWithText } from './dom.js';
 
 export function initImporter() {
   const btn = $id('urlLoadBtn');
@@ -95,7 +95,7 @@ export function initImporter() {
     if (searchAbort) searchAbort.abort();
     searchAbort = new AbortController();
 
-    resultsEl.innerHTML = '<div class="search-result-loading"><span class="spinner"></span></div>';
+    resultsEl.innerHTML = `<div class="search-result-loading">${SPINNER_HTML}</div>`;
     setDisplay(resultsEl, 'block');
 
     try {
@@ -243,7 +243,7 @@ function startDownload(url) {
     if (nextState === IMPORT_UI_STATE.CONNECTING) {
       btn.disabled = true;
       urlInput.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span>Loading…';
+      btn.innerHTML = spinnerWithText('Loading…');
       artEl.innerHTML = '🎵';
       setText(titleEl, 'Connecting…');
       setText(artistEl, '');
