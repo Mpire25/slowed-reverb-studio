@@ -2,7 +2,7 @@ import { state } from './state.js';
 import { makeIR } from './audio.js';
 import { buildID3Tag } from './id3.js';
 import { getExportSuffix, sanitize, toast } from './utils.js';
-import { $id, setDisplay, toggleClass, setHtml } from './dom.js';
+import { $id, setDisplay, toggleClass, setHtml, spinnerWithText } from './dom.js';
 
 export function closeModal() {
   toggleClass($id('modalOverlay'), 'open', false);
@@ -15,7 +15,7 @@ export function setProgress(pct) {
 export async function doExport(filename) {
   const confirmBtn = $id('modalConfirm');
   confirmBtn.disabled = true;
-  setHtml(confirmBtn, '<span class="spinner"></span>Rendering…');
+  setHtml(confirmBtn, spinnerWithText('Rendering…'));
   setDisplay($id('progressWrap'), 'block');
   setProgress(0);
 

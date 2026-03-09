@@ -1,4 +1,5 @@
 const idCache = new Map();
+export const SPINNER_HTML = '<span class="spinner"></span>';
 
 export function $id(id) {
   if (idCache.has(id)) return idCache.get(id);
@@ -16,6 +17,10 @@ export function $ids(ids) {
 export function setHtml(el, value) {
   if (!el) return;
   el.innerHTML = value;
+}
+
+export function spinnerWithText(text) {
+  return `${SPINNER_HTML}${text}`;
 }
 
 export function toggleClass(el, cls, on) {
