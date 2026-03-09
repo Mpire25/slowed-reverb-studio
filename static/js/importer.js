@@ -2,25 +2,26 @@ import { state } from './state.js';
 import { loadFile, updateSourceImportUI } from './loader.js';
 import { SERVER } from './config.js';
 import { toast } from './utils.js';
+import { $id, setDisplay, setText, toggleClass } from './dom.js';
 
 export function initImporter() {
-  const btn        = document.getElementById('urlLoadBtn');
-  const urlInput   = document.getElementById('urlInput');
+  const btn = $id('urlLoadBtn');
+  const urlInput = $id('urlInput');
 
   async function checkServer() {
-    const statusEl = document.getElementById('serverStatus');
-    const labelEl = document.getElementById('statusLabel');
-    statusEl.style.display = 'flex';
+    const statusEl = $id('serverStatus');
+    const labelEl = $id('statusLabel');
+    setDisplay(statusEl, 'flex');
     try {
       const r = await fetch(`${SERVER}/ping`, { signal: AbortSignal.timeout(800) });
       if (r.ok) {
         state.serverOnline = true;
         btn.disabled = false;
-        labelEl.textContent = 'Bridge connected';
+        setText(labelEl, 'Bridge connected');
         statusEl.className = 'server-status online';
       }
     } catch (_) {
-      labelEl.textContent = 'Bridge offline';
+      setText(labelEl, 'Bridge offline');
       statusEl.className = 'server-status';
     }
     updateSourceImportUI();
@@ -42,11 +43,11 @@ export function initImporter() {
   });
 
   // ── Tab switching ──────────────────────────────────────────────
-  const tabUrl     = document.getElementById('tabUrl');
-  const tabSearch  = document.getElementById('tabSearch');
-  const urlMode    = document.getElementById('urlMode');
-  const searchMode = document.getElementById('searchMode');
-  const searchInput= document.getElementById('searchInput');
+  const tabUrl = $id('tabUrl');
+  const tabSearch = $id('tabSearch');
+  const urlMode = $id('urlMode');
+  const searchMode = $id('searchMode');
+  const searchInput = $id('searchInput');
 
   tabUrl.addEventListener('click', () => {
     tabUrl.classList.add('active');
@@ -65,7 +66,7 @@ export function initImporter() {
   });
 
   // ── Search ─────────────────────────────────────────────────────
-  const resultsEl = document.getElementById('searchResults');
+  const resultsEl = $id('searchResults');
   let searchTimer = null;
   let searchAbort = null;
 
@@ -150,23 +151,23 @@ function escHtml(str) {
 
 // ── Shared SSE download flow ───────────────────────────────────
 function startDownload(url) {
-  const btn        = document.getElementById('urlLoadBtn');
-  const urlInput   = document.getElementById('urlInput');
-  const statusEl   = document.getElementById('importStatus');
-  const artEl      = document.getElementById('importArt');
-  const titleEl    = document.getElementById('importTitle');
-  const artistEl   = document.getElementById('importArtist');
-  const stageEl    = document.getElementById('importStage');
-  const barEl      = document.getElementById('importBar');
-  const trackProgEl= document.getElementById('importTrackProgress');
-  const trackListEl= document.getElementById('importTrackList');
+  const btn = $id('urlLoadBtn');
+  const urlInput = $id('urlInput');
+  const statusEl = $id('importStatus');
+  const artEl = $id('importArt');
+  const titleEl = $id('importTitle');
+  const artistEl = $id('importArtist');
+  const stageEl = $id('importStage');
+  const barEl = $id('importBar');
+  const trackProgEl = $id('importTrackProgress');
+  const trackListEl = $id('importTrackList');
   let stageSwapTimer = null;
 
   const setImportStage = (text) => {
     clearTimeout(stageSwapTimer);
     stageEl.classList.add('updating');
     stageSwapTimer = setTimeout(() => {
-      stageEl.textContent = text || '';
+      setText(stageEl, text || '');
       stageEl.classList.remove('updating');
     }, 120);
   };
@@ -176,16 +177,16 @@ function startDownload(url) {
       trackProgEl.classList.contains('visible') ||
       trackListEl.classList.contains('visible') ||
       !!trackListEl.children.length;
-    statusEl.classList.toggle('expanded', showTrackMeta);
+    toggleClass(statusEl, 'expanded', showTrackMeta);
   };
 
   // Hide drop zone, divider, tabs and active mode during loading
-  const dropZone  = document.getElementById('dropZone');
+  const dropZone = $id('dropZone');
   const dividerEl = document.querySelector('.url-divider');
-  const tabsEl    = document.querySelector('.import-tabs');
-  const urlMode   = document.getElementById('urlMode');
-  const searchModeEl = document.getElementById('searchMode');
-  const searchActive = document.getElementById('tabSearch').classList.contains('active');
+  const tabsEl = document.querySelector('.import-tabs');
+  const urlMode = $id('urlMode');
+  const searchModeEl = $id('searchMode');
+  const searchActive = $id('tabSearch').classList.contains('active');
 
   // Only show loading UI once we have confirmation it's real
   let confirmed = false;
@@ -198,7 +199,7 @@ function startDownload(url) {
     tabsEl.classList.add('load-hiding');
     if (searchActive) searchModeEl.classList.add('load-hiding');
     else urlMode.classList.add('load-hiding');
-    statusEl.style.display = 'block';
+    setDisplay(statusEl, 'block');
     statusEl.classList.remove('expanded', 'live');
     requestAnimationFrame(() => statusEl.classList.add('live'));
   };
@@ -223,9 +224,9 @@ function startDownload(url) {
 
   // Pre-populate the import card (hidden until confirmed)
   artEl.innerHTML = '🎵';
-  titleEl.textContent = 'Connecting…';
-  artistEl.textContent = '';
-  stageEl.textContent = '';
+  setText(titleEl, 'Connecting…');
+  setText(artistEl, '');
+  setText(stageEl, '');
   barEl.style.width = '0%';
   trackProgEl.style.display = 'block';
   trackListEl.style.display = 'block';
@@ -250,9 +251,9 @@ function startDownload(url) {
     confirmAndShow();
     const d = JSON.parse(e.data);
     completedTitle = d.name || d.title || 'track';
-    titleEl.textContent = completedTitle;
+    setText(titleEl, completedTitle);
     const trackCount = d.total_tracks > 1 ? ` • ${d.total_tracks} tracks` : '';
-    artistEl.textContent = (d.artist || '') + trackCount;
+    setText(artistEl, (d.artist || '') + trackCount);
     if (d.image_url) {
       artEl.innerHTML = `<img src="${d.image_url}" alt="album art">`;
     }
@@ -293,7 +294,7 @@ function startDownload(url) {
   es.addEventListener('track_complete', e => {
     const d = JSON.parse(e.data);
     completedFile = d.file;
-    const item = document.getElementById(`itrack-${d.index}`);
+    const item = $id(`itrack-${d.index}`);
     if (item) {
       item.className = 'import-track-item done';
       item.innerHTML = `<span class="import-track-check">✓</span>${d.artist} – ${d.title}`;
@@ -303,7 +304,7 @@ function startDownload(url) {
 
   es.addEventListener('track_error', e => {
     const d = JSON.parse(e.data);
-    const item = document.getElementById(`itrack-${d.index}`);
+    const item = $id(`itrack-${d.index}`);
     if (item) {
       item.className = 'import-track-item done';
       item.innerHTML = `<span class="import-track-err">✗</span>${d.title}`;
@@ -327,7 +328,7 @@ function startDownload(url) {
       };
       await loadFile(ab, completedTitle + '.mp3', { sourceLinks });
       urlInput.value = '';
-      statusEl.style.display = 'none';
+      setDisplay(statusEl, 'none');
       statusEl.classList.remove('expanded', 'live');
     } catch (err) {
       setImportStage('✗ ' + err.message);
@@ -356,6 +357,6 @@ function startDownload(url) {
 
   function hideImportStatus() {
     statusEl.classList.remove('live', 'expanded');
-    setTimeout(() => { statusEl.style.display = 'none'; }, 350);
+    setTimeout(() => { setDisplay(statusEl, 'none'); }, 350);
   }
 }
