@@ -7,21 +7,11 @@ Runs on port 7337. Provides SSE-based download streaming and file serving.
 import json
 import os
 import queue
-import re
 import threading
 import time
 from pathlib import Path
 
-_ANSI_RE = re.compile(r'\x1b\[[0-9;]*[A-Za-z]')
-_YTDLP_PREFIX_RE = re.compile(r'^(ERROR|WARNING):\s*(\[[^\]]+\]\s*)?', re.IGNORECASE)
-
-def _clean(msg: str) -> str:
-    msg = _ANSI_RE.sub('', msg).strip()
-    # Take only the first line (yt-dlp sometimes appends stack traces)
-    msg = msg.splitlines()[0].strip() if msg else msg
-    # Strip "ERROR: [extractor] " prefix from yt-dlp messages
-    msg = _YTDLP_PREFIX_RE.sub('', msg).strip()
-    return msg
+from backend_utils import clean_error_message
 
 from flask import Flask, Response, jsonify, request, send_file, send_from_directory, stream_with_context
 from flask_cors import CORS
@@ -68,17 +58,6 @@ def _sse(event_type, data):
     return f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
 
 
-def extract_tags(mp3_path):
-    try:
-        from mutagen.id3 import ID3
-        tags = ID3(str(mp3_path))
-        title = str(tags.get("TIT2", Path(mp3_path).stem))
-        artist = str(tags.get("TPE1", "Unknown"))
-        return title, artist
-    except Exception:
-        return Path(mp3_path).stem, "Unknown"
-
-
 _ytmusic = None
 
 def _get_ytmusic():
@@ -113,7 +92,7 @@ def search():
             })
         return jsonify(out)
     except Exception as e:
-        return jsonify({"error": _clean(str(e))}), 500
+        return jsonify({"error": clean_error_message(str(e))}), 500
 
 
 @app.route("/api/download/stream")
@@ -161,7 +140,7 @@ def download_stream():
                     "artist": info["artist"],
                 })
         except Exception as e:
-            on_event("error", {"message": _clean(str(e))})
+            on_event("error", {"message": clean_error_message(str(e))})
         finally:
             q.put(None)  # sentinel
 
