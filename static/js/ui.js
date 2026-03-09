@@ -264,4 +264,11 @@ document.addEventListener('keydown', e => {
   if (e.key === 'N' && e.shiftKey) {
     if (state.audioBuffer) { e.preventDefault(); resetStudio(); }
   }
+  if (e.key === 'm' || e.key === 'M') {
+    e.preventDefault();
+    state.muted = !state.muted;
+    applyVolume();
+    updateMuteBtn();
+    updateVolumeTrack();
+  }
 });
