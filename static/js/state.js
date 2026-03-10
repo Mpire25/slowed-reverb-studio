@@ -56,5 +56,6 @@ export const settings = {
 };
 
 export const SETTINGS_STORAGE_KEY = 'slowedReverbStudio.settings.v1';
+export const PLAYBACK_STORAGE_KEY = 'slowedReverbStudio.playback.v1';
 export const MIN_SPEED = 0.5;
 export const MAX_SPEED = 1.5;

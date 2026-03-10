@@ -1,4 +1,4 @@
-import { state, settings, SETTINGS_STORAGE_KEY } from './state.js';
+import { state, settings, SETTINGS_STORAGE_KEY, PLAYBACK_STORAGE_KEY } from './state.js';
 import { clampSpeed } from './utils.js';
 import { setThemeCss } from './theme.js';
 import { $id } from './dom.js';
@@ -40,6 +40,18 @@ export function saveSettings() {
   }
 }
 
+export function savePlaybackState() {
+  try {
+    localStorage.setItem(PLAYBACK_STORAGE_KEY, JSON.stringify({
+      speed: state.speed,
+      reverbMix: state.reverbMix,
+      reverbDecay: state.reverbDecay,
+    }));
+  } catch (err) {
+    console.warn('Failed to save playback state to localStorage', err);
+  }
+}
+
 export function syncSettingsUI() {
   $id('defaultSpeed').value = settings.defaultSpeed;
   $id('defaultReverb').value = settings.defaultReverb;
@@ -48,9 +60,19 @@ export function syncSettingsUI() {
   $id('artThemeToggle').checked = settings.artThemeEnabled;
 
   settings.defaultSpeed = clampSpeed(settings.defaultSpeed);
-  state.speed = settings.defaultSpeed;
-  state.reverbMix = settings.defaultReverb / 100;
-  state.reverbDecay = settings.defaultDecay;
+
+  // Restore last-used playback values; fall back to settings defaults
+  try {
+    const raw = localStorage.getItem(PLAYBACK_STORAGE_KEY);
+    const saved = raw ? JSON.parse(raw) : null;
+    state.speed = (saved && Number.isFinite(saved.speed)) ? saved.speed : settings.defaultSpeed;
+    state.reverbMix = (saved && Number.isFinite(saved.reverbMix)) ? saved.reverbMix : settings.defaultReverb / 100;
+    state.reverbDecay = (saved && Number.isFinite(saved.reverbDecay)) ? saved.reverbDecay : settings.defaultDecay;
+  } catch {
+    state.speed = settings.defaultSpeed;
+    state.reverbMix = settings.defaultReverb / 100;
+    state.reverbDecay = settings.defaultDecay;
+  }
   state.loopEnabled = settings.loopEnabled;
   state.visualizerEnabled = settings.visualizerEnabled;
   setThemeCss(state.themeCurrent);

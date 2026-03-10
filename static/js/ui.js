@@ -18,7 +18,7 @@ import {
 import { handleFileObject, resetStudio, updateSourceImportUI } from './loader.js';
 import { initImporter } from './importer.js';
 import { doExport, closeModal } from './exporter.js';
-import { loadSettings, saveSettings, syncSettingsUI } from './settings.js';
+import { loadSettings, saveSettings, savePlaybackState, syncSettingsUI } from './settings.js';
 import { applyThemeFromCurrentTrack } from './theme.js';
 import { $id, setText, toggleClass } from './dom.js';
 import {
@@ -46,12 +46,14 @@ $id('speedSlider').addEventListener('input', e => {
   syncSpeedControls(state.speed);
   if (state.source) state.source.playbackRate.value = state.speed;
   updateTimeDisplay();
+  savePlaybackState();
 });
 
 $id('reverbSlider').addEventListener('input', e => {
   state.reverbMix = e.target.value / 100;
   syncReverbControls(state.reverbMix);
   applyEffects();
+  savePlaybackState();
 });
 
 $id('decaySlider').addEventListener('input', e => {
@@ -62,6 +64,7 @@ $id('decaySlider').addEventListener('input', e => {
     const ctx = getCtx();
     state.convolver.buffer = makeIR(ctx, state.reverbDecay);
   }
+  savePlaybackState();
 });
 
 // ─── Transport Controls ──────────────────────────────────────────────────────
