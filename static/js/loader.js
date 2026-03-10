@@ -1,6 +1,7 @@
-import { state } from './state.js';
+import { state, settings } from './state.js';
 import { readID3 } from './id3.js';
 import { loadAudioBuffer, play, updatePlayBtn, stopActiveSource, resetAudioNodes } from './audio.js';
+import { syncSpeedControls, syncReverbControls, syncDecayControls } from './controls.js';
 import { buildWaveformData, drawWaveform } from './waveform.js';
 import {
   clearBottomVisualizerFade,
@@ -78,6 +79,15 @@ export function updateSourceImportUI() {
 
 export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceLinks = null } = {}) {
   showLoading(true);
+
+  // Reset effects to settings defaults so each song starts fresh
+  state.speed = settings.defaultSpeed;
+  state.reverbMix = settings.defaultReverb / 100;
+  state.reverbDecay = settings.defaultDecay;
+  syncSpeedControls(state.speed);
+  syncReverbControls(state.reverbMix);
+  syncDecayControls(state.reverbDecay);
+
   try {
     const tags = readID3(arrayBuffer);
     state.title = tags['TIT2'] || filename.replace(/\.mp3$/i, '') || 'Unknown Title';
