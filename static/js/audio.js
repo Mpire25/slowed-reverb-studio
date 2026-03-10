@@ -150,11 +150,24 @@ export function pause() {
 export function seekTo(fraction) {
   const offset = fraction * state.duration;
   state.pausedAt = offset;
-  if (state.playing) {
-    const ctx = getCtx();
-    buildPipeline(ctx);
-    createSource(ctx, offset);
+  if (!state.playing) return;
+
+  const ctx = getCtx();
+  const FADE = 0.015; // 15ms — enough to silence the click
+
+  if (state.masterGain) {
+    state.masterGain.gain.cancelScheduledValues(ctx.currentTime);
+    state.masterGain.gain.setTargetAtTime(0, ctx.currentTime, FADE / 3);
   }
+
+  setTimeout(() => {
+    buildPipeline(ctx);
+    const targetVol = state.muted ? 0 : state.volume;
+    state.masterGain.gain.cancelScheduledValues(ctx.currentTime);
+    state.masterGain.gain.setValueAtTime(0, ctx.currentTime);
+    state.masterGain.gain.linearRampToValueAtTime(targetVol, ctx.currentTime + FADE);
+    createSource(ctx, offset);
+  }, FADE * 1000);
 }
 
 export function applyEffects() {
