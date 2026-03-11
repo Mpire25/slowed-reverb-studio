@@ -57,8 +57,7 @@ $id('reverbSlider').addEventListener('input', e => {
 $id('decaySlider').addEventListener('input', e => {
   state.reverbDecay = e.target.value / 10;
   syncDecayControls(state.reverbDecay);
-  if (state.playing) rebuildPlayback();
-  else if (state.convolver) {
+  if (state.convolver) {
     const ctx = getCtx();
     state.convolver.buffer = makeIR(ctx, state.reverbDecay);
   }
