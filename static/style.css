@@ -190,7 +190,11 @@ header{display:flex;align-items:center;justify-content:space-between;max-width:1
 }
 .transport-icon-btn:hover{color:var(--text)}
 .transport-icon-btn svg{width:18px;height:18px}
-.loop-btn.active{color:var(--text)}
+.loop-grad-stop1{stop-color:var(--muted);transition:stop-color .85s ease}
+.loop-grad-stop2{stop-color:var(--muted);transition:stop-color .85s ease}
+.transport-icon-btn:hover .loop-grad-stop1,.transport-icon-btn:hover .loop-grad-stop2{stop-color:var(--text)}
+.loop-btn.active .loop-grad-stop1{stop-color:var(--accent1)}
+.loop-btn.active .loop-grad-stop2{stop-color:var(--accent2)}
 .time-display{font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .volume-control{display:flex;align-items:center;gap:4px;margin-left:auto}
 .volume-slider{width:80px;flex:none}

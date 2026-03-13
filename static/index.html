@@ -137,7 +137,13 @@
       </svg>
     </button>
     <button class="transport-icon-btn loop-btn" id="loopBtn" title="Loop Off" aria-label="Toggle Loop" aria-pressed="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+      <svg viewBox="0 0 24 24" fill="none" stroke="url(#loopGrad)" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+        <defs>
+          <linearGradient id="loopGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" class="loop-grad-stop1"/>
+            <stop offset="100%" class="loop-grad-stop2"/>
+          </linearGradient>
+        </defs>
         <path d="M8 7h9l-2.5-2.5M16 17H7l2.5 2.5M17 7c2 0 3 1 3 3v1M7 17c-2 0-3-1-3-3v-1"/>
       </svg>
     </button>
