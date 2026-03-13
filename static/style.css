@@ -190,8 +190,8 @@ header{display:flex;align-items:center;justify-content:space-between;max-width:1
 }
 .transport-icon-btn:hover{color:var(--text)}
 .transport-icon-btn svg{width:18px;height:18px}
-.loop-grad-stop1{stop-color:var(--muted);transition:stop-color .85s ease}
-.loop-grad-stop2{stop-color:var(--muted);transition:stop-color .85s ease}
+.loop-grad-stop1{stop-color:var(--muted);transition:stop-color .2s ease}
+.loop-grad-stop2{stop-color:var(--muted);transition:stop-color .2s ease}
 .transport-icon-btn:hover .loop-grad-stop1,.transport-icon-btn:hover .loop-grad-stop2{stop-color:var(--text)}
 .loop-btn.active .loop-grad-stop1{stop-color:var(--accent1)}
 .loop-btn.active .loop-grad-stop2{stop-color:var(--accent2)}
