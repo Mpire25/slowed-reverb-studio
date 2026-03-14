@@ -137,7 +137,6 @@ export function initImporter() {
         resultsEl.innerHTML = '';
         searchInput.value = '';
         searchInput.disabled = true;
-        state.importing = true;
         const ytUrl = `https://music.youtube.com/watch?v=${item.videoId}`;
         startDownload(ytUrl);
       });
@@ -215,6 +214,8 @@ function startDownload(url) {
   function showLoadingCardIfNeeded() {
     if (confirmed) return;
     confirmed = true;
+    dropZone.classList.remove('ui-disabled');
+    tabsEl.classList.remove('ui-disabled');
     dropZone.classList.add('load-hiding');
     dividerEl.classList.add('load-hiding');
     tabsEl.classList.add('load-hiding');
@@ -226,9 +227,9 @@ function startDownload(url) {
   }
 
   function restoreInputs() {
-    dropZone.classList.remove('load-hiding');
+    dropZone.classList.remove('load-hiding', 'ui-disabled');
     dividerEl.classList.remove('load-hiding');
-    tabsEl.classList.remove('load-hiding');
+    tabsEl.classList.remove('load-hiding', 'ui-disabled');
     urlMode.classList.remove('load-hiding');
     searchModeEl.classList.remove('load-hiding');
     setDisplay(urlMode, searchActive ? 'none' : '');
@@ -244,6 +245,11 @@ function startDownload(url) {
     statusEl.classList.remove('live', 'expanded');
     setTimeout(() => { setDisplay(statusEl, 'none'); }, 350);
   }
+
+  // Lock all input surfaces immediately
+  state.importing = true;
+  dropZone.classList.add('ui-disabled');
+  tabsEl.classList.add('ui-disabled');
 
   function setImportUiState(nextState) {
     if (nextState === IMPORT_UI_STATE.CONNECTING) {
