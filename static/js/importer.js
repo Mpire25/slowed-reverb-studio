@@ -465,12 +465,25 @@ function startDownload(url, prefill = null) {
     try {
       const fileRes = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(file)}&consume=1`);
       if (!fileRes.ok) throw new Error('Could not retrieve file');
-      const ab = await fileRes.arrayBuffer();
+      const contentLength = parseInt(fileRes.headers.get('Content-Length') || '0', 10);
+      const reader = fileRes.body.getReader();
+      const chunks = [];
+      let received = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        received += value.byteLength;
+        if (contentLength > 0) setBarStageProgress('load', Math.round((received / contentLength) * 100));
+      }
+      const ab = new Uint8Array(received);
+      let pos = 0;
+      for (const chunk of chunks) { ab.set(chunk, pos); pos += chunk.byteLength; }
       const sourceLinks = {
         spotify: isSpotifySource ? url : null,
         youtube: isSpotifySource ? foundYouTubeUrl : url,
       };
-      await loadFile(ab, completedTitle + '.mp3', { sourceLinks });
+      await loadFile(ab.buffer, completedTitle + '.mp3', { sourceLinks });
       completeBarStage('load');
       urlInput.value = '';
       setDisplay(statusEl, 'none');
