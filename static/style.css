@@ -10,6 +10,7 @@
   --surface-soft:rgba(56,58,82,0.16);
   --border:rgba(102,106,136,0.3);
   --base-rgb:22,22,32;
+  --theme-transition-duration:0s;
   --theme1-h:262;
   --theme1-s:84%;
   --theme1-l:58%;
@@ -50,7 +51,7 @@ body{
   min-height:100vh;
 }
 body,.logo,.url-row button,.play-btn,.download-btn,.modal-confirm,.progress-bar,.new-song-btn{
-  transition:background .85s ease,background-image .85s ease,border-color .85s ease,box-shadow .85s ease,color .85s ease;
+  transition:background var(--theme-transition-duration) ease,background-image var(--theme-transition-duration) ease,border-color var(--theme-transition-duration) ease,box-shadow var(--theme-transition-duration) ease,color var(--theme-transition-duration) ease;
 }
 
 /* ── Layout ── */

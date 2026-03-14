@@ -1,6 +1,8 @@
 import { state, settings, DEFAULT_THEME } from './state.js';
 import { clampVal } from './utils.js';
 
+let themeTransitionsArmed = false;
+
 export function hueDistance(a, b) {
   const diff = Math.abs(a - b) % 360;
   return diff > 180 ? 360 - diff : diff;
@@ -67,36 +69,43 @@ export function setThemeCss(theme) {
   const c1 = hslToRgb(theme.h1, theme.s1, theme.l1);
   const c2 = hslToRgb(theme.h2, theme.s2, theme.l2);
   const base = hslToRgb(theme.baseH, theme.baseS, theme.baseL);
-  const bg = hslToRgb(theme.baseH, clampVal(theme.baseS * 0.85, 0, 45), clampVal(theme.baseL, 4, 26));
-  const card = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.2);
-  const panel = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.14);
-  const modal = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.18);
-  const toast = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.16);
-  const search = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.09);
-  const surfaceHover = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.26);
-  const surfaceSoft = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.18);
-  const border = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.28);
-  const scrollTrack = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.07);
-  const scrollThumbTop = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.15);
-  const scrollThumbBottom = mixRgb(base, { r: 0, g: 0, b: 0 }, 0.12);
-  const scrollBorder = mixRgb(base, { r: 0, g: 0, b: 0 }, 0.3);
+  const bg = hslToRgb(theme.baseH, clampVal(theme.baseS * 1.2, 0, 62), clampVal(theme.baseL, 4, 20));
+  const card = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.11);
+  const panel = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.08);
+  const modal = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.1);
+  const toast = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.09);
+  const search = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.06);
+  const surfaceHover = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.16);
+  const surfaceSoft = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.12);
+  const border = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.2);
+  const scrollTrack = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.06);
+  const scrollThumbTop = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.1);
+  const scrollThumbBottom = mixRgb(base, { r: 0, g: 0, b: 0 }, 0.16);
+  const scrollBorder = mixRgb(base, { r: 0, g: 0, b: 0 }, 0.36);
 
   root.style.setProperty('--accent1-rgb', `${c1.r},${c1.g},${c1.b}`);
   root.style.setProperty('--accent2-rgb', `${c2.r},${c2.g},${c2.b}`);
   root.style.setProperty('--base-rgb', `${base.r},${base.g},${base.b}`);
   root.style.setProperty('--bg', `rgb(${bg.r}, ${bg.g}, ${bg.b})`);
-  root.style.setProperty('--card', `rgba(${card.r}, ${card.g}, ${card.b}, 0.2)`);
+  root.style.setProperty('--card', `rgba(${card.r}, ${card.g}, ${card.b}, 0.16)`);
   root.style.setProperty('--panel-bg', `rgba(${panel.r}, ${panel.g}, ${panel.b}, 0.92)`);
   root.style.setProperty('--modal-bg', `rgba(${modal.r}, ${modal.g}, ${modal.b}, 0.96)`);
   root.style.setProperty('--toast-bg', `rgba(${toast.r}, ${toast.g}, ${toast.b}, 0.95)`);
   root.style.setProperty('--search-bg', `rgba(${search.r}, ${search.g}, ${search.b}, 0.96)`);
-  root.style.setProperty('--surface-hover', `rgba(${surfaceHover.r}, ${surfaceHover.g}, ${surfaceHover.b}, 0.24)`);
-  root.style.setProperty('--surface-soft', `rgba(${surfaceSoft.r}, ${surfaceSoft.g}, ${surfaceSoft.b}, 0.16)`);
-  root.style.setProperty('--border', `rgba(${border.r}, ${border.g}, ${border.b}, 0.3)`);
+  root.style.setProperty('--surface-hover', `rgba(${surfaceHover.r}, ${surfaceHover.g}, ${surfaceHover.b}, 0.18)`);
+  root.style.setProperty('--surface-soft', `rgba(${surfaceSoft.r}, ${surfaceSoft.g}, ${surfaceSoft.b}, 0.12)`);
+  root.style.setProperty('--border', `rgba(${border.r}, ${border.g}, ${border.b}, 0.26)`);
   root.style.setProperty('--scroll-track', `rgba(${scrollTrack.r}, ${scrollTrack.g}, ${scrollTrack.b}, 0.14)`);
   root.style.setProperty('--scroll-thumb', `linear-gradient(180deg, rgba(${scrollThumbTop.r}, ${scrollThumbTop.g}, ${scrollThumbTop.b}, 0.96), rgba(${scrollThumbBottom.r}, ${scrollThumbBottom.g}, ${scrollThumbBottom.b}, 0.95))`);
   root.style.setProperty('--scroll-thumb-hover', `linear-gradient(180deg, rgba(${surfaceHover.r}, ${surfaceHover.g}, ${surfaceHover.b}, 0.98), rgba(${scrollThumbBottom.r}, ${scrollThumbBottom.g}, ${scrollThumbBottom.b}, 0.96))`);
   root.style.setProperty('--scroll-border', `rgba(${scrollBorder.r}, ${scrollBorder.g}, ${scrollBorder.b}, 0.85)`);
+
+  if (!themeTransitionsArmed) {
+    themeTransitionsArmed = true;
+    requestAnimationFrame(() => {
+      root.style.setProperty('--theme-transition-duration', '.85s');
+    });
+  }
 }
 
 export function animateThemeTo(nextTheme, duration = 850) {
@@ -248,7 +257,7 @@ export async function extractThemeFromArtwork(blobUrl) {
             l2: clampVal(neutralL - 12, 24, 52),
             baseH: neutralHue,
             baseS: 0,
-            baseL: clampVal(6 + avgLumAll * 14, 6, 20),
+            baseL: clampVal(4 + avgLumAll * 10, 4, 14),
           });
           return;
         }
@@ -289,8 +298,8 @@ export async function extractThemeFromArtwork(blobUrl) {
           s2: bTone.s,
           l2: bTone.l,
           baseH: baseHue,
-          baseS: clampVal(avgSatAll * 52, 10, 42),
-          baseL: clampVal(6 + avgLumAll * 13, 6, 22),
+          baseS: clampVal(avgSatAll * 68, 16, 58),
+          baseL: clampVal(4 + avgLumAll * 11, 4, 16),
         });
       } catch (err) {
         console.warn('Album-art theme extraction failed', err);
