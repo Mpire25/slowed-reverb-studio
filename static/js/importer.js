@@ -381,14 +381,32 @@ function startDownload(url, prefill = null) {
   let foundYouTubeUrl = null;
   const isSpotifySource = /spotify\.com/i.test(url);
 
+  // Activate resolve stage immediately so the bar is visibly non-zero.
+  // scheduleBarProgress ensures fast SSE responses always animate FROM 8%
+  // rather than skipping straight to a later value.
+  advanceBarToStage('resolve');
+  const barStartTime = Date.now();
+  const BAR_ANIM_MIN_MS = 400;
+  function scheduleBarProgress(stage, pct) {
+    const wait = BAR_ANIM_MIN_MS - (Date.now() - barStartTime);
+    if (wait > 0) setTimeout(() => setBarStageProgress(stage, pct), wait);
+    else setBarStageProgress(stage, pct);
+  }
+
   const es = new EventSource(`${SERVER}/api/download/stream?url=${encodeURIComponent(url)}`);
 
   es.addEventListener('stage', e => {
     const d = JSON.parse(e.data);
     const msg = (d.stage in STAGE_MESSAGES) ? STAGE_MESSAGES[d.stage] : d.message;
     if (msg !== null) setImportStage(msg);
-    const barStage = SSE_TO_BAR_STAGE[d.stage];
-    if (barStage) advanceBarToStage(barStage);
+
+    if (d.stage === 'fetching_metadata') {
+      advanceBarToStage('resolve');
+      setBarStageProgress('resolve', 10);
+    } else {
+      const barStage = SSE_TO_BAR_STAGE[d.stage];
+      if (barStage) advanceBarToStage(barStage);
+    }
   });
 
   es.addEventListener('metadata', e => {
@@ -406,6 +424,12 @@ function startDownload(url, prefill = null) {
     setText(artistEl, d.artist || '');
     if (d.image_url) {
       artEl.innerHTML = `<img src="${d.image_url}" alt="album art">`;
+    }
+
+    if (isSpotifySource) {
+      scheduleBarProgress('resolve', 40);
+    } else {
+      scheduleBarProgress('resolve', 100);
     }
   });
 
