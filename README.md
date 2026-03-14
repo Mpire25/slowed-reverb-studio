@@ -69,8 +69,6 @@ slowed-reverb-studio/
   backend_utils.py      — shared backend helpers (error cleanup, formatting)
   requirements.txt
   downloads/            — imported MP3s saved here
-  tests/
-    test_backend.py     — backend unit tests (helpers + route guards)
   static/
     index.html          — app shell (HTML structure only)
     style.css           — all styles
