@@ -105,6 +105,8 @@ export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceL
       state.artMime = 'image/jpeg';
     }
 
+    void applyThemeFromCurrentTrack();
+
     const buf = await loadAudioBuffer(arrayBuffer);
     state.audioBuffer = buf;
     state.duration = buf.duration;
@@ -118,7 +120,6 @@ export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceL
     state.sourceYouTubeUrl = sourceLinks?.youtube || null;
 
     updateTrackUI();
-    void applyThemeFromCurrentTrack();
     showPlayerUI(true);
     updateSourceImportUI();
     toast('Track loaded', 3000, 'success');
