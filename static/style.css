@@ -186,9 +186,10 @@ header{display:flex;align-items:center;justify-content:space-between;max-width:1
 .transport-icon-btn{
   padding:6px;border:none;background:transparent;color:var(--muted);cursor:pointer;
   display:flex;align-items:center;justify-content:center;
-  transition:color .2s;flex-shrink:0;
+  transition:color .2s,transform .15s ease;flex-shrink:0;
 }
-.transport-icon-btn:hover{color:var(--text)}
+.transport-icon-btn:hover{color:var(--text);transform:scale(1.06)}
+.transport-icon-btn:active{transform:scale(0.92)}
 .transport-icon-btn svg{width:18px;height:18px}
 .loop-grad-stop1{stop-color:var(--muted);transition:stop-color .2s ease}
 .loop-grad-stop2{stop-color:var(--muted);transition:stop-color .2s ease}
