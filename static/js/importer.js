@@ -138,7 +138,7 @@ export function initImporter() {
         searchInput.value = '';
         searchInput.disabled = true;
         const ytUrl = `https://music.youtube.com/watch?v=${item.videoId}`;
-        startDownload(ytUrl);
+        startDownload(ytUrl, { title: item.title, artist: item.artist, thumbnail: item.thumbnail });
       });
       resultsEl.appendChild(el);
     }
@@ -158,7 +158,7 @@ const IMPORT_UI_STATE = {
 };
 
 // ── Shared SSE download flow ───────────────────────────────────
-function startDownload(url) {
+function startDownload(url, prefill = null) {
   const {
     urlLoadBtn: btn,
     urlInput,
@@ -210,6 +210,7 @@ function startDownload(url) {
   const searchActive = $id('tabSearch').classList.contains('active');
 
   let confirmed = false;
+  let cardShown = false;
 
   function showLoadingCardIfNeeded() {
     if (confirmed) return;
@@ -221,9 +222,12 @@ function startDownload(url) {
     tabsEl.classList.add('load-hiding');
     if (searchActive) searchModeEl.classList.add('load-hiding');
     else urlMode.classList.add('load-hiding');
-    setDisplay(statusEl, 'block');
-    statusEl.classList.remove('expanded', 'live');
-    requestAnimationFrame(() => statusEl.classList.add('live'));
+    if (!cardShown) {
+      setDisplay(statusEl, 'block');
+      statusEl.classList.remove('expanded', 'live');
+      requestAnimationFrame(() => statusEl.classList.add('live'));
+      cardShown = true;
+    }
   }
 
   function restoreInputs() {
@@ -284,7 +288,7 @@ function startDownload(url) {
       return;
     }
     if (nextState === IMPORT_UI_STATE.ERROR) {
-      if (confirmed) hideImportStatus();
+      if (cardShown) hideImportStatus();
       restoreInputs();
       return;
     }
@@ -294,6 +298,17 @@ function startDownload(url) {
 
   let completedFile = null;
   let completedTitle = 'track';
+
+  if (prefill) {
+    completedTitle = prefill.title || 'track';
+    setText(titleEl, completedTitle);
+    setText(artistEl, prefill.artist || '');
+    artEl.innerHTML = prefill.thumbnail ? `<img src="${prefill.thumbnail}" alt="album art">` : '🎵';
+    setDisplay(statusEl, 'block');
+    statusEl.classList.remove('expanded', 'live');
+    requestAnimationFrame(() => statusEl.classList.add('live'));
+    cardShown = true;
+  }
   let foundYouTubeUrl = null;
   const isSpotifySource = /spotify\.com/i.test(url);
 
