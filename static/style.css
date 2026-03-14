@@ -41,7 +41,7 @@ body{
              var(--bg);
   min-height:100vh;
 }
-body,.logo,.url-row button,.play-btn,.download-btn,.modal-confirm,.progress-bar,.import-bar,.new-song-btn{
+body,.logo,.url-row button,.play-btn,.download-btn,.modal-confirm,.progress-bar,.new-song-btn{
   transition:background .85s ease,background-image .85s ease,border-color .85s ease,box-shadow .85s ease,color .85s ease;
 }
 
@@ -438,8 +438,18 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
   transition:max-height .26s cubic-bezier(.22,.61,.36,1),padding .26s cubic-bezier(.22,.61,.36,1),opacity .24s ease,transform .24s cubic-bezier(.22,.61,.36,1)
 }
 .import-track-progress.visible{max-height:24px;opacity:.55;transform:translateY(0);padding:0 14px 4px}
-.import-bar-wrap{height:3px;background:rgba(255,255,255,.08);margin:0 14px 14px;border-radius:3px;overflow:hidden}
-.import-bar{height:3px;width:0%;background:linear-gradient(90deg,var(--accent1),var(--accent2));transition:width .25s;border-radius:3px}
+.import-stages-bar{display:flex;gap:5px;padding:0 20px 10px}
+.import-stage-seg{display:flex;flex-direction:column;gap:4px;flex:1}
+.import-stage-seg:nth-child(2){flex:2}
+.import-stage-seg::before{content:'';display:block;height:5px;border-radius:3px;background:rgba(255,255,255,.08);position:relative}
+.import-stage-fill{height:5px;border-radius:3px;background:linear-gradient(90deg,var(--accent1),var(--accent2));background-size:400% 100%;width:0%;transition:width .3s ease;margin-top:-9px}
+.import-stage-seg:nth-child(1) .import-stage-fill{background-position:0% 0}
+.import-stage-seg:nth-child(2) .import-stage-fill{background-position:33.33% 0}
+.import-stage-seg:nth-child(3) .import-stage-fill{background-position:66.67% 0}
+.import-stage-seg:nth-child(4) .import-stage-fill{background-position:100% 0}
+.import-stage-label{font-size:9px;letter-spacing:.04em;text-transform:uppercase;opacity:.35;color:#fff;transition:opacity .2s}
+.import-stage-seg.active .import-stage-label{opacity:.7}
+.import-stage-seg.done .import-stage-label{opacity:.55}
 .import-tracks{
   max-height:0;overflow-y:auto;border-top:1px solid rgba(255,255,255,0);opacity:0;
   transition:max-height .3s cubic-bezier(.22,.61,.36,1),opacity .24s ease,border-top-color .28s ease

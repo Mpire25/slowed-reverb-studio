@@ -86,7 +86,24 @@
       </div>
       <div class="import-stage" id="importStage"></div>
       <div class="import-track-progress" id="importTrackProgress" style="display:none"></div>
-      <div class="import-bar-wrap"><div class="import-bar" id="importBar"></div></div>
+      <div class="import-stages-bar" id="importStagesBar">
+        <div class="import-stage-seg" id="stageSeg-resolve">
+          <div class="import-stage-fill" id="stageFill-resolve"></div>
+          <span class="import-stage-label">Resolve</span>
+        </div>
+        <div class="import-stage-seg" id="stageSeg-download">
+          <div class="import-stage-fill" id="stageFill-download"></div>
+          <span class="import-stage-label">Download</span>
+        </div>
+        <div class="import-stage-seg" id="stageSeg-process">
+          <div class="import-stage-fill" id="stageFill-process"></div>
+          <span class="import-stage-label">Process</span>
+        </div>
+        <div class="import-stage-seg" id="stageSeg-load">
+          <div class="import-stage-fill" id="stageFill-load"></div>
+          <span class="import-stage-label">Load</span>
+        </div>
+      </div>
       <div class="import-tracks" id="importTrackList" style="display:none"></div>
     </div>
   </div>

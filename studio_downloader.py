@@ -9,6 +9,7 @@ import os
 import re
 import json
 import base64
+import subprocess
 import urllib.request
 import urllib.parse
 from pathlib import Path
@@ -284,7 +285,7 @@ def _embed_tags(mp3_path, track):
 
 # ── yt-dlp options ─────────────────────────────────────────────────────────────
 
-def _make_ydl_opts(output_template, on_event):
+def _make_ydl_opts(output_template, on_event, captured_path):
     def progress_hook(d):
         if d["status"] == "downloading":
             total = d.get("total_bytes") or d.get("total_bytes_estimate", 0)
@@ -293,19 +294,37 @@ def _make_ydl_opts(output_template, on_event):
                 pct = (downloaded / total) * 100
                 on_event("progress", {"percent": round(pct, 1), "stage": "downloading"})
         elif d["status"] == "finished":
-            on_event("stage", {"stage": "converting", "message": "Converting to MP3…"})
+            captured_path.append(d["filename"])
 
     return {
         "format": "bestaudio/best",
         "outtmpl": output_template,
-        "postprocessors": [
-            {"key": "FFmpegExtractAudio", "preferredcodec": "mp3", "preferredquality": "192"}
-        ],
         "quiet": True,
         "no_warnings": True,
         "progress_hooks": [progress_hook],
         "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
     }
+
+
+def _convert_to_mp3(input_path, output_path, duration_s, on_event):
+    on_event("stage", {"stage": "converting", "message": "Converting to MP3…"})
+    cmd = [
+        "ffmpeg", "-y", "-i", str(input_path),
+        "-vn", "-acodec", "libmp3lame", "-ab", "192k",
+        "-progress", "pipe:1", "-nostats",
+        str(output_path),
+    ]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    for line in proc.stdout:
+        if line.startswith("out_time_ms=") and duration_s > 0:
+            try:
+                ms = int(line.split("=")[1])
+                pct = min(99, round((ms / 1000 / duration_s) * 100, 1))
+                on_event("progress", {"percent": pct, "stage": "converting"})
+            except ValueError:
+                pass
+    proc.wait()
+    Path(input_path).unlink(missing_ok=True)
 
 
 # ── Single track download (Spotify flow) ──────────────────────────────────────
@@ -315,6 +334,7 @@ def _download_track(track, on_event):
     query = f"{track['artist']} - {track['name']}"
     filename = safe_filename(query)
     output = str(DOWNLOADS_DIR / f"{filename}.%(ext)s")
+    duration_s = (track.get("duration_ms") or 0) // 1000
 
     on_event("stage", {"stage": "searching",
                         "message": f"Searching YouTube Music for {query}…"})
@@ -329,16 +349,15 @@ def _download_track(track, on_event):
 
     on_event("stage", {"stage": "downloading", "message": "Downloading…"})
 
-    with yt_dlp.YoutubeDL(_make_ydl_opts(output, on_event)) as ydl:
+    captured = []
+    with yt_dlp.YoutubeDL(_make_ydl_opts(output, on_event, captured)) as ydl:
         ydl.download([source])
 
     mp3_path = DOWNLOADS_DIR / f"{filename}.mp3"
-    if not mp3_path.exists():
-        raise RuntimeError(f"MP3 not found after download: {filename}")
+    _convert_to_mp3(captured[0], mp3_path, duration_s, on_event)
 
     on_event("stage", {"stage": "embedding", "message": "Embedding metadata & art…"})
     _embed_tags(str(mp3_path), track)
-    on_event("progress", {"percent": 100, "stage": "embedding"})
 
     return mp3_path
 
@@ -376,16 +395,15 @@ def download_youtube(url, on_event):
 
     on_event("stage", {"stage": "downloading", "message": "Downloading…"})
 
-    with yt_dlp.YoutubeDL(_make_ydl_opts(output, on_event)) as ydl:
+    captured = []
+    with yt_dlp.YoutubeDL(_make_ydl_opts(output, on_event, captured)) as ydl:
         ydl.download([url])
 
     mp3_path = DOWNLOADS_DIR / f"{filename}.mp3"
-    if not mp3_path.exists():
-        raise RuntimeError("MP3 not found after download")
+    _convert_to_mp3(captured[0], mp3_path, duration, on_event)
 
     on_event("stage", {"stage": "embedding", "message": "Embedding metadata…"})
     _embed_tags(str(mp3_path), {"name": title, "artist": uploader, "image_url": thumbnail})
-    on_event("progress", {"percent": 100, "stage": "embedding"})
 
     return mp3_path, {"title": title, "artist": uploader}
 
