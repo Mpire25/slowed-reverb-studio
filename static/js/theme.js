@@ -60,6 +60,7 @@ function mixRgb(a, b, t) {
 
 export function setThemeCss(theme) {
   const root = document.documentElement;
+  const isMonochrome = !!theme.mono;
   root.style.setProperty('--theme1-h', theme.h1.toFixed(2));
   root.style.setProperty('--theme1-s', `${theme.s1.toFixed(2)}%`);
   root.style.setProperty('--theme1-l', `${theme.l1.toFixed(2)}%`);
@@ -87,6 +88,8 @@ export function setThemeCss(theme) {
   root.style.setProperty('--accent2-rgb', `${c2.r},${c2.g},${c2.b}`);
   root.style.setProperty('--base-rgb', `${base.r},${base.g},${base.b}`);
   root.style.setProperty('--bg', `rgb(${bg.r}, ${bg.g}, ${bg.b})`);
+  root.style.setProperty('--text', '#e2e8f0');
+  root.style.setProperty('--muted', '#64748b');
   root.style.setProperty('--card', `rgba(${card.r}, ${card.g}, ${card.b}, 0.16)`);
   root.style.setProperty('--panel-bg', `rgba(${panel.r}, ${panel.g}, ${panel.b}, 0.92)`);
   root.style.setProperty('--modal-bg', `rgba(${modal.r}, ${modal.g}, ${modal.b}, 0.96)`);
@@ -99,6 +102,17 @@ export function setThemeCss(theme) {
   root.style.setProperty('--scroll-thumb', `linear-gradient(180deg, rgba(${scrollThumbTop.r}, ${scrollThumbTop.g}, ${scrollThumbTop.b}, 0.96), rgba(${scrollThumbBottom.r}, ${scrollThumbBottom.g}, ${scrollThumbBottom.b}, 0.95))`);
   root.style.setProperty('--scroll-thumb-hover', `linear-gradient(180deg, rgba(${surfaceHover.r}, ${surfaceHover.g}, ${surfaceHover.b}, 0.98), rgba(${scrollThumbBottom.r}, ${scrollThumbBottom.g}, ${scrollThumbBottom.b}, 0.96))`);
   root.style.setProperty('--scroll-border', `rgba(${scrollBorder.r}, ${scrollBorder.g}, ${scrollBorder.b}, 0.85)`);
+  if (isMonochrome) {
+    root.style.setProperty('--neutral-input-bg', 'rgba(255,255,255,0.14)');
+    root.style.setProperty('--neutral-btn-bg', 'rgba(255,255,255,0.18)');
+    root.style.setProperty('--neutral-btn-hover', 'rgba(255,255,255,0.24)');
+    root.style.setProperty('--neutral-btn-text', 'var(--text)');
+  } else {
+    root.style.setProperty('--neutral-input-bg', 'rgba(255,255,255,0.06)');
+    root.style.setProperty('--neutral-btn-bg', 'rgba(255,255,255,0.07)');
+    root.style.setProperty('--neutral-btn-hover', 'rgba(255,255,255,0.11)');
+    root.style.setProperty('--neutral-btn-text', 'var(--text)');
+  }
 
   if (!themeTransitionsArmed) {
     themeTransitionsArmed = true;
@@ -119,6 +133,7 @@ export function animateThemeTo(nextTheme, duration = 850) {
     baseH: ((nextTheme.baseH % 360) + 360) % 360,
     baseS: clampVal(nextTheme.baseS, 0, 100),
     baseL: clampVal(nextTheme.baseL, 3, 30),
+    mono: nextTheme.mono ? 1 : 0,
   };
   state.themeTarget = target;
   if (state.themeAnimFrame) cancelAnimationFrame(state.themeAnimFrame);
@@ -138,6 +153,7 @@ export function animateThemeTo(nextTheme, duration = 850) {
       baseH: lerpHue(startTheme.baseH, target.baseH, eased),
       baseS: startTheme.baseS + (target.baseS - startTheme.baseS) * eased,
       baseL: startTheme.baseL + (target.baseL - startTheme.baseL) * eased,
+      mono: target.mono,
     };
     state.themeCurrent = cur;
     setThemeCss(cur);
@@ -247,17 +263,17 @@ export async function extractThemeFromArtwork(blobUrl) {
 
         if (isMonochrome) {
           const neutralHue = hueVectorMag > 0.08 ? baseHueFromStats : DEFAULT_THEME.baseH;
-          const neutralL = clampVal(46 + (avgLumAll - 0.5) * 22, 38, 62);
           resolve({
             h1: neutralHue,
             s1: 0,
-            l1: neutralL,
+            l1: 72,
             h2: (neutralHue + 12) % 360,
             s2: 0,
-            l2: clampVal(neutralL - 12, 24, 52),
+            l2: 38,
             baseH: neutralHue,
             baseS: 0,
-            baseL: clampVal(4 + avgLumAll * 10, 4, 14),
+            baseL: clampVal(4 + avgLumAll * 8, 4, 13),
+            mono: 1,
           });
           return;
         }
@@ -300,6 +316,7 @@ export async function extractThemeFromArtwork(blobUrl) {
           baseH: baseHue,
           baseS: clampVal(avgSatAll * 68, 16, 58),
           baseL: clampVal(4 + avgLumAll * 11, 4, 16),
+          mono: 0,
         });
       } catch (err) {
         console.warn('Album-art theme extraction failed', err);
