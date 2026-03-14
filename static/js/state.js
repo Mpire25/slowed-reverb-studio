@@ -1,6 +1,7 @@
 export const DEFAULT_THEME = {
   h1: 262, s1: 84, l1: 58,
   h2: 190, s2: 89, l2: 43,
+  baseH: 238, baseS: 22, baseL: 8,
 };
 
 export const state = {

@@ -1,6 +1,8 @@
 import { state, settings, DEFAULT_THEME } from './state.js';
 import { clampVal } from './utils.js';
 
+let themeTransitionsArmed = false;
+
 export function hueDistance(a, b) {
   const diff = Math.abs(a - b) % 360;
   return diff > 180 ? 360 - diff : diff;
@@ -48,6 +50,14 @@ export function rgbToHsl(r, g, b) {
   return { h: h * 60, s, l };
 }
 
+function mixRgb(a, b, t) {
+  return {
+    r: Math.round(a.r + (b.r - a.r) * t),
+    g: Math.round(a.g + (b.g - a.g) * t),
+    b: Math.round(a.b + (b.b - a.b) * t),
+  };
+}
+
 export function setThemeCss(theme) {
   const root = document.documentElement;
   root.style.setProperty('--theme1-h', theme.h1.toFixed(2));
@@ -58,18 +68,57 @@ export function setThemeCss(theme) {
   root.style.setProperty('--theme2-l', `${theme.l2.toFixed(2)}%`);
   const c1 = hslToRgb(theme.h1, theme.s1, theme.l1);
   const c2 = hslToRgb(theme.h2, theme.s2, theme.l2);
+  const base = hslToRgb(theme.baseH, theme.baseS, theme.baseL);
+  const bg = hslToRgb(theme.baseH, clampVal(theme.baseS * 1.2, 0, 62), clampVal(theme.baseL, 4, 20));
+  const card = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.11);
+  const panel = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.08);
+  const modal = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.1);
+  const toast = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.09);
+  const search = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.06);
+  const surfaceHover = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.16);
+  const surfaceSoft = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.12);
+  const border = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.2);
+  const scrollTrack = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.06);
+  const scrollThumbTop = mixRgb(base, { r: 255, g: 255, b: 255 }, 0.1);
+  const scrollThumbBottom = mixRgb(base, { r: 0, g: 0, b: 0 }, 0.16);
+  const scrollBorder = mixRgb(base, { r: 0, g: 0, b: 0 }, 0.36);
+
   root.style.setProperty('--accent1-rgb', `${c1.r},${c1.g},${c1.b}`);
   root.style.setProperty('--accent2-rgb', `${c2.r},${c2.g},${c2.b}`);
+  root.style.setProperty('--base-rgb', `${base.r},${base.g},${base.b}`);
+  root.style.setProperty('--bg', `rgb(${bg.r}, ${bg.g}, ${bg.b})`);
+  root.style.setProperty('--card', `rgba(${card.r}, ${card.g}, ${card.b}, 0.16)`);
+  root.style.setProperty('--panel-bg', `rgba(${panel.r}, ${panel.g}, ${panel.b}, 0.92)`);
+  root.style.setProperty('--modal-bg', `rgba(${modal.r}, ${modal.g}, ${modal.b}, 0.96)`);
+  root.style.setProperty('--toast-bg', `rgba(${toast.r}, ${toast.g}, ${toast.b}, 0.95)`);
+  root.style.setProperty('--search-bg', `rgba(${search.r}, ${search.g}, ${search.b}, 0.96)`);
+  root.style.setProperty('--surface-hover', `rgba(${surfaceHover.r}, ${surfaceHover.g}, ${surfaceHover.b}, 0.18)`);
+  root.style.setProperty('--surface-soft', `rgba(${surfaceSoft.r}, ${surfaceSoft.g}, ${surfaceSoft.b}, 0.12)`);
+  root.style.setProperty('--border', `rgba(${border.r}, ${border.g}, ${border.b}, 0.26)`);
+  root.style.setProperty('--scroll-track', `rgba(${scrollTrack.r}, ${scrollTrack.g}, ${scrollTrack.b}, 0.14)`);
+  root.style.setProperty('--scroll-thumb', `linear-gradient(180deg, rgba(${scrollThumbTop.r}, ${scrollThumbTop.g}, ${scrollThumbTop.b}, 0.96), rgba(${scrollThumbBottom.r}, ${scrollThumbBottom.g}, ${scrollThumbBottom.b}, 0.95))`);
+  root.style.setProperty('--scroll-thumb-hover', `linear-gradient(180deg, rgba(${surfaceHover.r}, ${surfaceHover.g}, ${surfaceHover.b}, 0.98), rgba(${scrollThumbBottom.r}, ${scrollThumbBottom.g}, ${scrollThumbBottom.b}, 0.96))`);
+  root.style.setProperty('--scroll-border', `rgba(${scrollBorder.r}, ${scrollBorder.g}, ${scrollBorder.b}, 0.85)`);
+
+  if (!themeTransitionsArmed) {
+    themeTransitionsArmed = true;
+    requestAnimationFrame(() => {
+      root.style.setProperty('--theme-transition-duration', '.85s');
+    });
+  }
 }
 
 export function animateThemeTo(nextTheme, duration = 850) {
   const target = {
     h1: ((nextTheme.h1 % 360) + 360) % 360,
-    s1: clampVal(nextTheme.s1, 35, 100),
+    s1: clampVal(nextTheme.s1, 0, 100),
     l1: clampVal(nextTheme.l1, 20, 80),
     h2: ((nextTheme.h2 % 360) + 360) % 360,
-    s2: clampVal(nextTheme.s2, 35, 100),
+    s2: clampVal(nextTheme.s2, 0, 100),
     l2: clampVal(nextTheme.l2, 20, 80),
+    baseH: ((nextTheme.baseH % 360) + 360) % 360,
+    baseS: clampVal(nextTheme.baseS, 0, 100),
+    baseL: clampVal(nextTheme.baseL, 3, 30),
   };
   state.themeTarget = target;
   if (state.themeAnimFrame) cancelAnimationFrame(state.themeAnimFrame);
@@ -86,6 +135,9 @@ export function animateThemeTo(nextTheme, duration = 850) {
       h2: lerpHue(startTheme.h2, target.h2, eased),
       s2: startTheme.s2 + (target.s2 - startTheme.s2) * eased,
       l2: startTheme.l2 + (target.l2 - startTheme.l2) * eased,
+      baseH: lerpHue(startTheme.baseH, target.baseH, eased),
+      baseS: startTheme.baseS + (target.baseS - startTheme.baseS) * eased,
+      baseL: startTheme.baseL + (target.baseL - startTheme.baseL) * eased,
     };
     state.themeCurrent = cur;
     setThemeCss(cur);
@@ -108,67 +160,82 @@ export async function extractThemeFromArtwork(blobUrl) {
         c.drawImage(img, 0, 0, side, side);
         const px = c.getImageData(0, 0, side, side).data;
         const bins = Array.from({ length: 36 }, () => ({ w: 0, h: 0, s: 0, l: 0 }));
-
-        let totalW = 0, totalSatW = 0, totalLumW = 0;
+        let allCount = 0;
+        let allSat = 0;
+        let allLum = 0;
+        let chromaSum = 0;
+        let strongSatCount = 0;
+        let hueX = 0;
+        let hueY = 0;
+        let hueWeightSum = 0;
 
         for (let i = 0; i < px.length; i += 4) {
           const a = px[i + 3];
           if (a < 160) continue;
-          const { h, s, l } = rgbToHsl(px[i], px[i + 1], px[i + 2]);
-          if (l < 0.08 || l > 0.92 || s < 0.08) continue;
-          const weight = s * (0.55 + 0.45 * (1 - Math.abs(l - 0.5) * 2));
+          const r = px[i];
+          const g = px[i + 1];
+          const b = px[i + 2];
+          const { h, s, l } = rgbToHsl(r, g, b);
+          const chroma = (Math.max(r, g, b) - Math.min(r, g, b)) / 255;
+
+          allCount += 1;
+          allSat += s;
+          allLum += l;
+          chromaSum += chroma;
+          if (s > 0.18) strongSatCount += 1;
+
+          const hueWeight = Math.max(s, 0.04) * (0.5 + 0.5 * (1 - Math.abs(l - 0.5) * 2));
+          hueX += Math.cos((h * Math.PI) / 180) * hueWeight;
+          hueY += Math.sin((h * Math.PI) / 180) * hueWeight;
+          hueWeightSum += hueWeight;
+
+          if (l < 0.04 || l > 0.96 || s < 0.04) continue;
+          const weight = (0.3 + s * 0.9) * (0.45 + 0.55 * (1 - Math.abs(l - 0.5) * 2));
           const bi = Math.floor(h / 10) % 36;
           bins[bi].w += weight;
           bins[bi].h += h * weight;
           bins[bi].s += s * weight;
           bins[bi].l += l * weight;
-          totalW += weight;
-          totalSatW += s * weight;
-          totalLumW += l * weight;
         }
+
+        if (!allCount) {
+          resolve(null);
+          return;
+        }
+
+        const avgSatAll = allSat / allCount;
+        const avgLumAll = allLum / allCount;
+        const avgChroma = chromaSum / allCount;
+        const strongSatRatio = strongSatCount / allCount;
+        const hueVectorMag = hueWeightSum > 0 ? Math.hypot(hueX, hueY) / hueWeightSum : 0;
+        const hueVector = (Math.atan2(hueY, hueX) * 180) / Math.PI;
+        const baseHueFromStats = ((hueVector % 360) + 360) % 360;
+
+        const lowColorEnergy = avgSatAll < 0.11 || avgChroma < 0.075;
+        const sparseColor = strongSatRatio < 0.03;
+        const unstableHue = hueVectorMag < 0.16;
+        let isMonochrome = lowColorEnergy && (sparseColor || unstableHue);
 
         let first = -1;
         let firstW = 0;
         for (let i = 0; i < bins.length; i++) {
-          if (bins[i].w > firstW) { firstW = bins[i].w; first = i; }
-        }
-        if (first < 0 || firstW < 0.2) { resolve(null); return; }
-
-        // Compute image mood to adaptively clamp output saturation/lightness.
-        // Muted/dark images shouldn't be forced into vivid mid-tone accents.
-        const avgSat = totalW > 0 ? totalSatW / totalW : 0.5;
-        const avgLum = totalW > 0 ? totalLumW / totalW : 0.5;
-        const mutedFactor = Math.min(1, avgSat / 0.35);  // 0 = very muted, 1 = vivid
-        const darkFactor  = Math.min(1, avgLum / 0.40);  // 0 = very dark,  1 = bright
-        const sMin = Math.round(35 + mutedFactor * 23);  // 35–58
-        const sMax = Math.round(75 + mutedFactor * 20);  // 75–95
-        const lMin = Math.round(22 + darkFactor  * 12);  // 22–34
-        const lMax = Math.round(52 + darkFactor  * 14);  // 52–66
-
-        let second = -1;
-        let secondW = 0;
-        const firstHue = first * 10;
-        for (let i = 0; i < bins.length; i++) {
-          if (i === first) continue;
-          const hue = i * 10;
-          if (hueDistance(firstHue, hue) < 36) continue;
-          if (bins[i].w > secondW) { secondW = bins[i].w; second = i; }
-        }
-        // Relax distance constraint for monochromatic/muted images
-        if (second < 0) {
-          secondW = 0;
-          for (let i = 0; i < bins.length; i++) {
-            if (i === first) continue;
-            if (hueDistance(firstHue, i * 10) < 20) continue;
-            if (bins[i].w > secondW) { secondW = bins[i].w; second = i; }
+          if (bins[i].w > firstW) {
+            firstW = bins[i].w;
+            first = i;
           }
         }
-        // Final fallback: analogous hue (+30°) rather than jumping +120°
-        if (second < 0) second = (first + 3) % 36;
+        if (first < 0 || firstW < 0.14) isMonochrome = true;
+
+        const mutedFactor = clampVal(avgSatAll / 0.5, 0, 1);
+        const darkFactor = clampVal(avgLumAll / 0.55, 0, 1);
+        const sMin = Math.round(26 + mutedFactor * 36);
+        const sMax = Math.round(58 + mutedFactor * 38);
+        const lMin = Math.round(20 + darkFactor * 13);
+        const lMax = Math.round(42 + darkFactor * 22);
 
         function toneFrom(idx, fallbackHue) {
           const b = bins[idx];
-          if (!b || b.w < 0.2) {
+          if (!b || b.w < 0.14) {
             return { h: fallbackHue, s: (sMin + sMax) / 2, l: (lMin + lMax) / 2 };
           }
           return {
@@ -178,11 +245,61 @@ export async function extractThemeFromArtwork(blobUrl) {
           };
         }
 
+        if (isMonochrome) {
+          const neutralHue = hueVectorMag > 0.08 ? baseHueFromStats : DEFAULT_THEME.baseH;
+          const neutralL = clampVal(46 + (avgLumAll - 0.5) * 22, 38, 62);
+          resolve({
+            h1: neutralHue,
+            s1: 0,
+            l1: neutralL,
+            h2: (neutralHue + 12) % 360,
+            s2: 0,
+            l2: clampVal(neutralL - 12, 24, 52),
+            baseH: neutralHue,
+            baseS: 0,
+            baseL: clampVal(4 + avgLumAll * 10, 4, 14),
+          });
+          return;
+        }
+
+        let second = -1;
+        let secondW = 0;
+        const firstHue = first * 10;
+        for (let i = 0; i < bins.length; i++) {
+          if (i === first) continue;
+          const hue = i * 10;
+          if (hueDistance(firstHue, hue) < 30) continue;
+          if (bins[i].w > secondW) {
+            secondW = bins[i].w;
+            second = i;
+          }
+        }
+        if (second < 0) {
+          secondW = 0;
+          for (let i = 0; i < bins.length; i++) {
+            if (i === first) continue;
+            if (hueDistance(firstHue, i * 10) < 16) continue;
+            if (bins[i].w > secondW) {
+              secondW = bins[i].w;
+              second = i;
+            }
+          }
+        }
+        if (second < 0) second = (first + 3) % 36;
+
         const aTone = toneFrom(first, first * 10);
         const bTone = toneFrom(second, second * 10);
+        const baseHue = hueVectorMag > 0.08 ? baseHueFromStats : aTone.h;
         resolve({
-          h1: aTone.h, s1: aTone.s, l1: aTone.l,
-          h2: bTone.h, s2: bTone.s, l2: bTone.l,
+          h1: aTone.h,
+          s1: aTone.s,
+          l1: aTone.l,
+          h2: bTone.h,
+          s2: bTone.s,
+          l2: bTone.l,
+          baseH: baseHue,
+          baseS: clampVal(avgSatAll * 68, 16, 58),
+          baseL: clampVal(4 + avgLumAll * 11, 4, 16),
         });
       } catch (err) {
         console.warn('Album-art theme extraction failed', err);
