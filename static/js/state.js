@@ -4,6 +4,7 @@ export const DEFAULT_THEME = {
 };
 
 export const state = {
+  importing: false,
   audioCtx: null,
   audioBuffer: null,
   source: null,

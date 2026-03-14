@@ -47,6 +47,7 @@ export function initImporter() {
     $ids(['tabUrl', 'tabSearch', 'urlMode', 'searchMode', 'searchInput']);
 
   tabUrl.addEventListener('click', () => {
+    if (state.importing) return;
     tabUrl.classList.add('active');
     tabSearch.classList.remove('active');
     setDisplay(urlMode, '');
@@ -55,6 +56,7 @@ export function initImporter() {
   });
 
   tabSearch.addEventListener('click', () => {
+    if (state.importing) return;
     tabSearch.classList.add('active');
     tabUrl.classList.remove('active');
     setDisplay(searchMode, '');
@@ -135,6 +137,7 @@ export function initImporter() {
         resultsEl.innerHTML = '';
         searchInput.value = '';
         searchInput.disabled = true;
+        state.importing = true;
         const ytUrl = `https://music.youtube.com/watch?v=${item.videoId}`;
         startDownload(ytUrl);
       });
@@ -233,6 +236,7 @@ function startDownload(url) {
     btn.disabled = false;
     urlInput.disabled = false;
     document.getElementById('searchInput').disabled = false;
+    state.importing = false;
     setText(btn, 'Load');
   }
 

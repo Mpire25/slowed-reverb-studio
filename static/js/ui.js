@@ -155,18 +155,19 @@ updateVolumeTrack();
 const dropZone = $id('dropZone');
 const fileInput = $id('fileInput');
 
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragover', e => { if (state.importing) return; e.preventDefault(); dropZone.classList.add('drag-over'); });
 dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
 dropZone.addEventListener('drop', e => {
   e.preventDefault();
   dropZone.classList.remove('drag-over');
+  if (state.importing) return;
   const file = e.dataTransfer.files[0];
   if (file) handleFileObject(file);
 });
 
 fileInput.addEventListener('change', e => {
   const file = e.target.files[0];
-  if (file) handleFileObject(file);
+  if (file && !state.importing) handleFileObject(file);
   fileInput.value = '';
 });
 
