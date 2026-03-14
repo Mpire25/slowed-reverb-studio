@@ -222,7 +222,7 @@ function startDownload(url, prefill = null) {
     tabsEl.classList.add('load-hiding');
     if (searchActive) searchModeEl.classList.add('load-hiding');
     else urlMode.classList.add('load-hiding');
-    statusEl.classList.remove('waiting');
+    
     if (!cardShown) {
       setDisplay(statusEl, 'block');
       statusEl.classList.remove('expanded', 'live');
@@ -247,7 +247,7 @@ function startDownload(url, prefill = null) {
   }
 
   function hideImportStatus() {
-    statusEl.classList.remove('live', 'expanded', 'waiting');
+    statusEl.classList.remove('live', 'expanded');
     setTimeout(() => { setDisplay(statusEl, 'none'); }, 350);
   }
 
@@ -307,7 +307,6 @@ function startDownload(url, prefill = null) {
     artEl.innerHTML = prefill.thumbnail ? `<img src="${prefill.thumbnail}" alt="album art">` : '🎵';
     setDisplay(statusEl, 'block');
     statusEl.classList.remove('expanded', 'live');
-    statusEl.classList.add('waiting');
     requestAnimationFrame(() => statusEl.classList.add('live'));
     cardShown = true;
   }
