@@ -182,7 +182,10 @@ let barStageIndex = -1;
 function advanceBarToStage(stageName) {
   const idx = BAR_STAGES.indexOf(stageName);
   if (idx < 0 || idx <= barStageIndex) return;
-  for (let i = barStageIndex + 1; i < idx; i++) completeBarStage(BAR_STAGES[i]);
+  // Complete all earlier stages when we advance (e.g. resolve -> download).
+  for (let i = Math.max(0, barStageIndex); i < idx; i++) {
+    completeBarStage(BAR_STAGES[i]);
+  }
   barStageIndex = idx;
   setBarStageActive(stageName);
   setBarStageProgress(stageName, 8);
