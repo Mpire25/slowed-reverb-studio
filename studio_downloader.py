@@ -318,8 +318,8 @@ def _convert_to_mp3(input_path, output_path, duration_s, on_event):
     for line in proc.stdout:
         if line.startswith("out_time_ms=") and duration_s > 0:
             try:
-                ms = int(line.split("=")[1])
-                pct = min(99, round((ms / 1000 / duration_s) * 100, 1))
+                us = int(line.split("=")[1])
+                pct = min(99, round((us / 1_000_000 / duration_s) * 100, 1))
                 on_event("progress", {"percent": pct, "stage": "converting"})
             except ValueError:
                 pass

@@ -189,7 +189,6 @@ function advanceBarToStage(stageName) {
   }
   barStageIndex = idx;
   setBarStageActive(stageName);
-  setBarStageProgress(stageName, 8);
 }
 
 function setBarStageProgress(stageName, pct) {
@@ -403,6 +402,13 @@ function startDownload(url, prefill = null) {
     if (d.stage === 'fetching_metadata') {
       advanceBarToStage('resolve');
       setBarStageProgress('resolve', 10);
+    } else if (d.stage === 'converting') {
+      // Complete prior stages and activate process, but don't set a fake
+      // initial value — real ffmpeg progress events will fill it from 0.
+      const idx = BAR_STAGES.indexOf('process');
+      for (let i = Math.max(0, barStageIndex); i < idx; i++) completeBarStage(BAR_STAGES[i]);
+      barStageIndex = idx;
+      setBarStageActive('process');
     } else {
       const barStage = SSE_TO_BAR_STAGE[d.stage];
       if (barStage) advanceBarToStage(barStage);
