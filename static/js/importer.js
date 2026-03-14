@@ -178,6 +178,7 @@ const SSE_TO_BAR_STAGE = {
 };
 const BAR_STAGES = ['resolve', 'download', 'process', 'load'];
 let barStageIndex = -1;
+const barStageProgress = Object.create(null);
 
 function advanceBarToStage(stageName) {
   const idx = BAR_STAGES.indexOf(stageName);
@@ -192,8 +193,12 @@ function advanceBarToStage(stageName) {
 }
 
 function setBarStageProgress(stageName, pct) {
+  const next = Math.max(0, Math.min(100, Number(pct) || 0));
+  const current = barStageProgress[stageName] || 0;
+  const clamped = Math.max(current, next); // Never let a stage visually move backwards.
+  barStageProgress[stageName] = clamped;
   const el = $id('stageFill-' + stageName);
-  if (el) el.style.width = pct + '%';
+  if (el) el.style.width = clamped + '%';
 }
 
 function completeBarStage(stageName) {
@@ -210,6 +215,7 @@ function setBarStageActive(stageName) {
 function resetBarStages() {
   barStageIndex = -1;
   BAR_STAGES.forEach(s => {
+    barStageProgress[s] = 0;
     const fill = $id('stageFill-' + s);
     const seg  = $id('stageSeg-' + s);
     if (fill) fill.style.width = '0%';
@@ -464,7 +470,6 @@ function startDownload(url, prefill = null) {
     setImportStage('Loading into studio…');
     setTimeout(() => {
       advanceBarToStage('load');
-      setBarStageProgress('load', 100);
     }, 200);
     try {
       const fileRes = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(file)}&consume=1`);
@@ -473,12 +478,18 @@ function startDownload(url, prefill = null) {
       const reader = fileRes.body.getReader();
       const chunks = [];
       let received = 0;
+      let unknownLenProgress = 8;
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         chunks.push(value);
         received += value.byteLength;
-        if (contentLength > 0) setBarStageProgress('load', Math.round((received / contentLength) * 100));
+        if (contentLength > 0) {
+          setBarStageProgress('load', Math.round((received / contentLength) * 100));
+        } else {
+          unknownLenProgress = Math.min(92, unknownLenProgress + 6);
+          setBarStageProgress('load', unknownLenProgress);
+        }
       }
       const ab = new Uint8Array(received);
       let pos = 0;
@@ -489,9 +500,9 @@ function startDownload(url, prefill = null) {
       };
       await loadFile(ab.buffer, completedTitle + '.mp3', { sourceLinks });
       completeBarStage('load');
+      await new Promise(resolve => setTimeout(resolve, 220));
       urlInput.value = '';
-      setDisplay(statusEl, 'none');
-      statusEl.classList.remove('expanded', 'live');
+      hideImportStatus();
     } catch (err) {
       setImportStage('✗ ' + err.message);
       toast('Error: ' + err.message, 5000, 'error');

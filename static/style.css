@@ -463,6 +463,7 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
 .import-stage-label{font-size:9px;letter-spacing:.04em;text-transform:uppercase;opacity:.35;color:#fff;transition:opacity .2s}
 .import-stage-seg.active .import-stage-label{opacity:.7}
 .import-stage-seg.done .import-stage-label{opacity:.55}
+.import-stage-seg.done .import-stage-fill{transition:width .09s linear}
 .import-tracks{
   max-height:0;overflow-y:auto;border-top:1px solid rgba(255,255,255,0);opacity:0;
   transition:max-height .3s cubic-bezier(.22,.61,.36,1),opacity .24s ease,border-top-color .28s ease
