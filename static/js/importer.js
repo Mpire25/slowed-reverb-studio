@@ -413,7 +413,8 @@ function startDownload(url, prefill = null) {
 
   es.addEventListener('progress', e => {
     const d = JSON.parse(e.data);
-    setBarStageProgress('download', d.percent);
+    const seg = SSE_TO_BAR_STAGE[d.stage] || 'download';
+    setBarStageProgress(seg, d.percent);
   });
 
   /* PLAYLIST CODE — preserved for future use, currently disabled
