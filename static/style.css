@@ -198,6 +198,10 @@ header{display:flex;align-items:center;justify-content:space-between;max-width:1
 .transport-icon-btn:hover .loop-grad-stop1,.transport-icon-btn:hover .loop-grad-stop2{stop-color:var(--text)}
 .loop-btn.active .loop-grad-stop1{stop-color:var(--accent1)}
 .loop-btn.active .loop-grad-stop2{stop-color:var(--accent2)}
+.loop-btn.active{filter:drop-shadow(0 0 6px rgba(var(--accent1-rgb),.55))}
+.loop-btn.active:hover .loop-grad-stop1{stop-color:var(--accent1)}
+.loop-btn.active:hover .loop-grad-stop2{stop-color:var(--accent2)}
+.loop-btn.active:hover{filter:drop-shadow(0 0 8px rgba(var(--accent1-rgb),.8)) brightness(1.25)}
 .time-display{font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .volume-control{display:flex;align-items:center;gap:4px;margin-left:auto}
 .volume-slider{width:80px;flex:none}
