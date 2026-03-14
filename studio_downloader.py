@@ -310,7 +310,7 @@ def _convert_to_mp3(input_path, output_path, duration_s, on_event):
     on_event("stage", {"stage": "converting", "message": "Converting to MP3…"})
     cmd = [
         "ffmpeg", "-y", "-i", str(input_path),
-        "-vn", "-acodec", "libmp3lame", "-ab", "192k",
+        "-vn", "-acodec", "libmp3lame", "-ab", "320k",
         "-progress", "pipe:1", "-nostats",
         str(output_path),
     ]
