@@ -134,6 +134,7 @@ export function initImporter() {
         setDisplay(resultsEl, 'none');
         resultsEl.innerHTML = '';
         searchInput.value = '';
+        searchInput.disabled = true;
         const ytUrl = `https://music.youtube.com/watch?v=${item.videoId}`;
         startDownload(ytUrl);
       });
@@ -231,6 +232,7 @@ function startDownload(url) {
     setDisplay(searchModeEl, searchActive ? '' : 'none');
     btn.disabled = false;
     urlInput.disabled = false;
+    document.getElementById('searchInput').disabled = false;
     setText(btn, 'Load');
   }
 
