@@ -438,11 +438,11 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
   transition:max-height .26s cubic-bezier(.22,.61,.36,1),padding .26s cubic-bezier(.22,.61,.36,1),opacity .24s ease,transform .24s cubic-bezier(.22,.61,.36,1)
 }
 .import-track-progress.visible{max-height:24px;opacity:.55;transform:translateY(0);padding:0 14px 4px}
-.import-stages-bar{display:flex;gap:5px;padding:0 14px 10px}
+.import-stages-bar{display:flex;gap:5px;padding:0 20px 10px}
 .import-stage-seg{display:flex;flex-direction:column;gap:4px;flex:1}
 .import-stage-seg:nth-child(2){flex:2}
-.import-stage-seg::before{content:'';display:block;height:3px;border-radius:2px;background:rgba(255,255,255,.08);position:relative}
-.import-stage-fill{height:3px;border-radius:2px;background:linear-gradient(90deg,var(--accent1),var(--accent2));width:0%;transition:width .3s ease;margin-top:-7px}
+.import-stage-seg::before{content:'';display:block;height:5px;border-radius:3px;background:rgba(255,255,255,.08);position:relative}
+.import-stage-fill{height:5px;border-radius:3px;background:linear-gradient(90deg,var(--accent1),var(--accent2));width:0%;transition:width .3s ease;margin-top:-9px}
 .import-stage-label{font-size:9px;letter-spacing:.04em;text-transform:uppercase;opacity:.35;color:#fff;transition:opacity .2s}
 .import-stage-seg.active .import-stage-label{opacity:.7}
 .import-stage-seg.done .import-stage-label{opacity:.55}
