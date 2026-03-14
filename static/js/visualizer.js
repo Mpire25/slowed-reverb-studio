@@ -224,12 +224,13 @@ export function drawBottomVisualizer(clearOnly = false) {
     ctx2d.stroke();
   }
 
+  const waveSpeedMult = state.speed || 1;
   ctx2d.shadowBlur = 24;
   ctx2d.shadowColor = 'rgba(124,58,237,0.2)';
-  drawWave(H - VISUALIZER_TUNING.baseOffsetA, VISUALIZER_TUNING.ampA, `hsla(${hueA.toFixed(1)},90%,60%,0.62)`, `hsla(${hueB.toFixed(1)},92%,56%,0.54)`, 0.34 + loudness * 0.9, 18, 1.2, 8.8);
-  drawWave(H - VISUALIZER_TUNING.baseOffsetB, VISUALIZER_TUNING.ampB, `hsla(${hueC.toFixed(1)},88%,68%,0.52)`, `hsla(${hueB.toFixed(1)},94%,62%,0.48)`, 0.28 + loudness * 0.7, 14, 1.55, 10.2);
+  drawWave(H - VISUALIZER_TUNING.baseOffsetA, VISUALIZER_TUNING.ampA, `hsla(${hueA.toFixed(1)},90%,60%,0.62)`, `hsla(${hueB.toFixed(1)},92%,56%,0.54)`, 0.34 + loudness * 0.9, 18, 1.2 * waveSpeedMult, 8.8);
+  drawWave(H - VISUALIZER_TUNING.baseOffsetB, VISUALIZER_TUNING.ampB, `hsla(${hueC.toFixed(1)},88%,68%,0.52)`, `hsla(${hueB.toFixed(1)},94%,62%,0.48)`, 0.28 + loudness * 0.7, 14, 1.55 * waveSpeedMult, 10.2);
   ctx2d.shadowBlur = 0;
-  drawWave(H - VISUALIZER_TUNING.baseOffsetC, VISUALIZER_TUNING.ampC, `hsla(${hueA.toFixed(1)},76%,80%,0.42)`, `hsla(${hueB.toFixed(1)},86%,76%,0.36)`, 0.24 + loudness * 0.5, 10, 1.8, 11.4);
+  drawWave(H - VISUALIZER_TUNING.baseOffsetC, VISUALIZER_TUNING.ampC, `hsla(${hueA.toFixed(1)},76%,80%,0.42)`, `hsla(${hueB.toFixed(1)},86%,76%,0.36)`, 0.24 + loudness * 0.5, 10, 1.8 * waveSpeedMult, 11.4);
 
   if (!state.playing && performance.now() >= state.visualizerFadeOutUntil) {
     clearBottomVisualizerFade();
