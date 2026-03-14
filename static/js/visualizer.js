@@ -153,6 +153,13 @@ export function drawBottomVisualizer(clearOnly = false) {
   }
 
   const now = Date.now() * 0.001;
+  const nowMs = performance.now();
+  if (state.visualizerLastFrameTime === undefined) state.visualizerLastFrameTime = nowMs;
+  const frameDelta = Math.min(0.1, (nowMs - state.visualizerLastFrameTime) * 0.001);
+  state.visualizerLastFrameTime = nowMs;
+  if (state.visualizerPhase === undefined) state.visualizerPhase = 0;
+  state.visualizerPhase += frameDelta * (state.speed || 1);
+  const animPhase = state.visualizerPhase;
   const pulse = Math.min(1, bass * 0.55 + lowMid * 0.3 + high * 0.15);
   const intensity = 0.35 + pulse * 0.45 + loudness * 0.8;
   const speedNorm = (state.speed - MIN_SPEED) / (MAX_SPEED - MIN_SPEED);
@@ -202,7 +209,7 @@ export function drawBottomVisualizer(clearOnly = false) {
       const t = i / (pointCount - 1);
       const x = t * W;
       const amp = Math.pow(state.visualizerBarData[i], 1.2) * (VISUALIZER_TUNING.waveHeightPx * ampScale);
-      const drift = Math.sin(now * speed + t * freq) *
+      const drift = Math.sin(animPhase * speed + t * freq) *
         (VISUALIZER_TUNING.driftBase + bass * VISUALIZER_TUNING.driftBassBoost + lowMid * VISUALIZER_TUNING.driftMidBoost);
       const y = yBase - amp - drift;
       if (i === 0) {
@@ -214,7 +221,7 @@ export function drawBottomVisualizer(clearOnly = false) {
         const prevX = prevT * W;
         const cx = (prevX + x) * 0.5;
         const prevAmp = Math.pow(state.visualizerBarData[i - 1], 1.2) * (VISUALIZER_TUNING.waveHeightPx * ampScale);
-        const prevDrift = Math.sin(now * speed + prevT * freq) *
+        const prevDrift = Math.sin(animPhase * speed + prevT * freq) *
           (VISUALIZER_TUNING.driftBase + bass * VISUALIZER_TUNING.driftBassBoost + lowMid * VISUALIZER_TUNING.driftMidBoost);
         const prevY = yBase - prevAmp - prevDrift;
         ctx2d.quadraticCurveTo(prevX, prevY, cx, (prevY + y) * 0.5);
@@ -224,13 +231,12 @@ export function drawBottomVisualizer(clearOnly = false) {
     ctx2d.stroke();
   }
 
-  const waveSpeedMult = state.speed || 1;
   ctx2d.shadowBlur = 24;
   ctx2d.shadowColor = 'rgba(124,58,237,0.2)';
-  drawWave(H - VISUALIZER_TUNING.baseOffsetA, VISUALIZER_TUNING.ampA, `hsla(${hueA.toFixed(1)},90%,60%,0.62)`, `hsla(${hueB.toFixed(1)},92%,56%,0.54)`, 0.34 + loudness * 0.9, 18, 1.2 * waveSpeedMult, 8.8);
-  drawWave(H - VISUALIZER_TUNING.baseOffsetB, VISUALIZER_TUNING.ampB, `hsla(${hueC.toFixed(1)},88%,68%,0.52)`, `hsla(${hueB.toFixed(1)},94%,62%,0.48)`, 0.28 + loudness * 0.7, 14, 1.55 * waveSpeedMult, 10.2);
+  drawWave(H - VISUALIZER_TUNING.baseOffsetA, VISUALIZER_TUNING.ampA, `hsla(${hueA.toFixed(1)},90%,60%,0.62)`, `hsla(${hueB.toFixed(1)},92%,56%,0.54)`, 0.34 + loudness * 0.9, 18, 1.2, 8.8);
+  drawWave(H - VISUALIZER_TUNING.baseOffsetB, VISUALIZER_TUNING.ampB, `hsla(${hueC.toFixed(1)},88%,68%,0.52)`, `hsla(${hueB.toFixed(1)},94%,62%,0.48)`, 0.28 + loudness * 0.7, 14, 1.55, 10.2);
   ctx2d.shadowBlur = 0;
-  drawWave(H - VISUALIZER_TUNING.baseOffsetC, VISUALIZER_TUNING.ampC, `hsla(${hueA.toFixed(1)},76%,80%,0.42)`, `hsla(${hueB.toFixed(1)},86%,76%,0.36)`, 0.24 + loudness * 0.5, 10, 1.8 * waveSpeedMult, 11.4);
+  drawWave(H - VISUALIZER_TUNING.baseOffsetC, VISUALIZER_TUNING.ampC, `hsla(${hueA.toFixed(1)},76%,80%,0.42)`, `hsla(${hueB.toFixed(1)},86%,76%,0.36)`, 0.24 + loudness * 0.5, 10, 1.8, 11.4);
 
   if (!state.playing && performance.now() >= state.visualizerFadeOutUntil) {
     clearBottomVisualizerFade();
