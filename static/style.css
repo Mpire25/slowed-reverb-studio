@@ -414,6 +414,17 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
   background:rgba(255,255,255,.06);
   box-shadow:0 10px 26px rgba(10,10,20,.22)
 }
+.import-status.waiting{
+  border-color:rgba(124,58,237,.5);
+  animation:borderTravel 2s linear infinite
+}
+@keyframes borderTravel{
+  0%   {box-shadow:0 -2px 5px -1px rgba(167,139,250,.7),0 10px 26px rgba(10,10,20,.22)}
+  25%  {box-shadow:2px 0 5px -1px rgba(167,139,250,.7),0 10px 26px rgba(10,10,20,.22)}
+  50%  {box-shadow:0 2px 5px -1px rgba(167,139,250,.7),0 10px 26px rgba(10,10,20,.22)}
+  75%  {box-shadow:-2px 0 5px -1px rgba(167,139,250,.7),0 10px 26px rgba(10,10,20,.22)}
+  100% {box-shadow:0 -2px 5px -1px rgba(167,139,250,.7),0 10px 26px rgba(10,10,20,.22)}
+}
 .import-status.expanded{
   transform:scale(1.016);
 }
