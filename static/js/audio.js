@@ -155,8 +155,8 @@ export function seekTo(fraction) {
   const ctx = getCtx();
   const FADE = 0.015;
 
-  // Audio is already silenced by silenceForScrub() — rebuild immediately, no timeout.
-  buildPipeline(ctx);
+  // Reuse existing pipeline — rebuilding it would cold-reset the analyser and dip the visualizer.
+  // Audio is already silenced by silenceForScrub(); just swap the source and fade back in.
   state.masterGain.gain.cancelScheduledValues(ctx.currentTime);
   state.masterGain.gain.setValueAtTime(0, ctx.currentTime);
   state.masterGain.gain.linearRampToValueAtTime(state.muted ? 0 : state.volume, ctx.currentTime + FADE);
