@@ -113,7 +113,7 @@ The studio has its own `studio_downloader.py` with callback-based progress rathe
 
 ## Technical notes
 
-- MP3 encoding uses [lamejs](https://github.com/zhuker/lamejs) served at `static/lib/lame.min.js` at 192 kbps stereo
+- MP3 encoding uses [lamejs](https://github.com/zhuker/lamejs) served at `static/lib/lame.min.js` at 320 kbps stereo
 - Reverb impulse response is generated algorithmically (exponential noise decay) — no IR file needed
 - Export renders via `OfflineAudioContext` then encodes to MP3 with a hand-written ID3v2.3 tag prepended
 - Speed change intentionally shifts pitch (no pitch correction) — this is the slowed & reverb sound
