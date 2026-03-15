@@ -33,6 +33,7 @@ export const state = {
   artMime: 'image/jpeg',
   duration: 0,
   waveformData: null,
+  scrubFraction: null,  // non-null while waveform is being dragged
   animFrame: null,
   serverOnline: false,
   visualizerEnabled: true,

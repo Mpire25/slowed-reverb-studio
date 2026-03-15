@@ -1,7 +1,7 @@
 import { state, settings } from './state.js';
 import { clampSpeed, getExportSuffix, sanitize } from './utils.js';
 import {
-  play, pause, seekTo,
+  play, pause, seekTo, silenceForScrub,
   currentPosition, getCtx,
   updatePlayBtn, updateLoopBtn,
   makeIR, applyEffects, rebuildPlayback,
@@ -136,19 +136,45 @@ updateVolumeTrack();
 (function() {
   const canvas = $id('waveform');
   let scrubbing = false;
-  function doSeek(e) {
+
+  function getFraction(e) {
     const rect = canvas.getBoundingClientRect();
     const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-    seekTo(Math.max(0, Math.min(1, x / rect.width)));
+    return Math.max(0, Math.min(1, x / rect.width));
+  }
+
+  function onScrubStart(e) {
+    scrubbing = true;
+    state.scrubFraction = getFraction(e);
+    silenceForScrub();
     drawWaveform();
     updateTimeDisplay();
   }
-  canvas.addEventListener('mousedown', e => { scrubbing = true; doSeek(e); });
-  canvas.addEventListener('mousemove', e => { if (scrubbing) doSeek(e); });
-  canvas.addEventListener('mouseup', () => scrubbing = false);
-  canvas.addEventListener('touchstart', e => { e.preventDefault(); scrubbing = true; doSeek(e); }, { passive: false });
-  canvas.addEventListener('touchmove', e => { e.preventDefault(); if (scrubbing) doSeek(e); }, { passive: false });
-  canvas.addEventListener('touchend', () => scrubbing = false);
+
+  function onScrubMove(e) {
+    if (!scrubbing) return;
+    state.scrubFraction = getFraction(e);
+    drawWaveform();
+    updateTimeDisplay();
+  }
+
+  function onScrubEnd(e) {
+    if (!scrubbing) return;
+    scrubbing = false;
+    const fraction = state.scrubFraction;
+    state.scrubFraction = null;
+    seekTo(fraction);
+    drawWaveform();
+    updateTimeDisplay();
+  }
+
+  canvas.addEventListener('mousedown', onScrubStart);
+  canvas.addEventListener('mousemove', onScrubMove);
+  canvas.addEventListener('mouseup', onScrubEnd);
+  window.addEventListener('mouseup', () => { if (scrubbing) onScrubEnd(); });
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); onScrubStart(e); }, { passive: false });
+  canvas.addEventListener('touchmove', e => { e.preventDefault(); onScrubMove(e); }, { passive: false });
+  canvas.addEventListener('touchend', e => { e.preventDefault(); onScrubEnd(e); }, { passive: false });
 })();
 
 // ─── File Drop / Pick ────────────────────────────────────────────────────────

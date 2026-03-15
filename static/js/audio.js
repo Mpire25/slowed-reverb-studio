@@ -153,21 +153,21 @@ export function seekTo(fraction) {
   if (!state.playing) return;
 
   const ctx = getCtx();
-  const FADE = 0.015; // 15ms — enough to silence the click
+  const FADE = 0.015;
 
-  if (state.masterGain) {
-    state.masterGain.gain.cancelScheduledValues(ctx.currentTime);
-    state.masterGain.gain.setTargetAtTime(0, ctx.currentTime, FADE / 3);
-  }
+  // Audio is already silenced by silenceForScrub() — rebuild immediately, no timeout.
+  buildPipeline(ctx);
+  state.masterGain.gain.cancelScheduledValues(ctx.currentTime);
+  state.masterGain.gain.setValueAtTime(0, ctx.currentTime);
+  state.masterGain.gain.linearRampToValueAtTime(state.muted ? 0 : state.volume, ctx.currentTime + FADE);
+  createSource(ctx, offset);
+}
 
-  setTimeout(() => {
-    buildPipeline(ctx);
-    const targetVol = state.muted ? 0 : state.volume;
-    state.masterGain.gain.cancelScheduledValues(ctx.currentTime);
-    state.masterGain.gain.setValueAtTime(0, ctx.currentTime);
-    state.masterGain.gain.linearRampToValueAtTime(targetVol, ctx.currentTime + FADE);
-    createSource(ctx, offset);
-  }, FADE * 1000);
+export function silenceForScrub() {
+  if (!state.masterGain || !state.audioCtx) return;
+  const ctx = state.audioCtx;
+  state.masterGain.gain.cancelScheduledValues(ctx.currentTime);
+  state.masterGain.gain.setTargetAtTime(0, ctx.currentTime, 0.003);
 }
 
 export function applyEffects() {

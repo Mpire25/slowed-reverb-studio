@@ -29,15 +29,16 @@ export function drawWaveform() {
 
   if (!state.waveformData) { ctx2d.setTransform(1,0,0,1,0,0); return; }
 
-  const currentPosition = state.duration > 0
-    ? ((!state.playing || !state.audioCtx)
-      ? state.pausedAt
-      : (state.loopEnabled
-          ? ((state.audioCtx.currentTime - state.startTime) * state.speed) % state.duration
-          : Math.min((state.audioCtx.currentTime - state.startTime) * state.speed, state.duration)))
-    : 0;
-
-  const pos = state.duration > 0 ? currentPosition / state.duration : 0;
+  const pos = state.scrubFraction !== null
+    ? state.scrubFraction
+    : state.duration > 0
+      ? ((!state.playing || !state.audioCtx)
+          ? state.pausedAt
+          : (state.loopEnabled
+              ? ((state.audioCtx.currentTime - state.startTime) * state.speed) % state.duration
+              : Math.min((state.audioCtx.currentTime - state.startTime) * state.speed, state.duration))
+        ) / state.duration
+      : 0;
   const playX = pos * W;
 
   // Draw bars

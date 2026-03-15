@@ -249,11 +249,13 @@ export function drawBottomVisualizer(clearOnly = false) {
 export function updateTimeDisplay() {
   // Compute displayPosition and displayDuration directly from state to avoid
   // importing audio.js (which would create a circular dependency).
-  const rawPos = (!state.playing || !state.audioCtx)
-    ? state.pausedAt
-    : state.loopEnabled
-      ? ((state.audioCtx.currentTime - state.startTime) * state.speed) % state.duration
-      : Math.min((state.audioCtx.currentTime - state.startTime) * state.speed, state.duration);
+  const rawPos = state.scrubFraction !== null
+    ? state.scrubFraction * state.duration
+    : (!state.playing || !state.audioCtx)
+      ? state.pausedAt
+      : state.loopEnabled
+        ? ((state.audioCtx.currentTime - state.startTime) * state.speed) % state.duration
+        : Math.min((state.audioCtx.currentTime - state.startTime) * state.speed, state.duration);
   const dispPos = state.speed ? rawPos / state.speed : 0;
   const dispDur = (state.duration && state.speed) ? state.duration / state.speed : 0;
   setText($id('timeDisplay'), `${fmt(dispPos)} / ${fmt(dispDur)}`);
