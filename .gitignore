@@ -1,5 +1,6 @@
 # Local agent notes
 CLAUDE.md
+.claude/worktrees/
 
 # Python bytecode and caches
 __pycache__/
