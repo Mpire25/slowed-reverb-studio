@@ -91,24 +91,6 @@ slowed-reverb-studio/
       config.js         — SERVER constant
 ```
 
-### Live download status (SSE)
-
-When you paste a URL and click Load, the frontend opens a Server-Sent Events stream to `/api/download/stream`. Progress events are streamed in real time:
-
-| Event | What it carries |
-|---|---|
-| `stage` | Current stage (fetching metadata, searching, downloading, converting…) |
-| `metadata` | Track/album/playlist info, artwork URL, total track count |
-| `found` | YouTube Music match found (or fallback to search) |
-| `progress` | Download percentage |
-| `track_start` | Per-track info for playlists |
-| `track_complete` | Per-track done + file path |
-| `track_error` | Per-track failure with reason |
-| `complete` | Final file path(s) — triggers load into studio |
-| `error` | Fatal error message |
-
-The studio has its own `studio_downloader.py` with callback-based progress rather than terminal output. If you want the standalone CLI tools separately, they live at [spotify-to-mp3](https://github.com/Mpire25/spotify-to-mp3) and [youtube-to-mp3](https://github.com/Mpire25/youtube-to-mp3).
-
 ---
 
 ## Technical notes
