@@ -293,7 +293,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'N' && e.shiftKey) {
     if (state.audioBuffer) { e.preventDefault(); resetStudio(); }
   }
-  if (e.key === 'm' || e.key === 'M') {
+  if ((e.key === 'm' || e.key === 'M') && !e.metaKey && !e.ctrlKey && !e.altKey) {
     e.preventDefault();
     state.muted = !state.muted;
     applyVolume();
