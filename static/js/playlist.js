@@ -13,6 +13,7 @@ const MAX_RETRIES = 2;
 
 const ps = {
   active: false,
+  loopEnabled: false,
   sourceUrl: null,
   tracks: [],         // {index, name, artist, album, duration_ms, image_url, video_id?, filePath, status, retries}
   currentIndex: -1,
@@ -32,6 +33,7 @@ export function initPlaylist(data, sourceUrl, { firstTrackPath = null } = {}) {
   _teardown();
 
   ps.active = true;
+  ps.loopEnabled = false;
   ps.sourceUrl = sourceUrl;
   ps.tracks = (data.tracks || []).map((t, i) => ({
     index: i,
@@ -146,7 +148,11 @@ function _onTrackEnded() {
   if (!ps.active) return;
   const next = ps.currentIndex + 1;
   if (next >= ps.tracks.length) {
-    // Playlist ended
+    if (ps.loopEnabled && ps.tracks.length > 0) {
+      jumpToTrack(0);
+      return;
+    }
+    // Playlist ended (loop playlist disabled)
     setOnTrackEnded(null);
     return;
   }
@@ -358,6 +364,7 @@ function _teardown() {
     t.cachedDecodedBuffer = null;
   }
   ps.active = false;
+  ps.loopEnabled = false;
   ps.tracks = [];
   ps.currentIndex = -1;
   ps.downloadingIndex = -1;
@@ -410,10 +417,12 @@ function _openPanel(name, count) {
   const nameEl = $id('playlistSidebarName');
   const countEl = $id('playlistSidebarCount');
   const mobileNameEl = $id('playlistMobileOverlayName');
+  const loopBtn = $id('playlistLoopBtn');
   const countStr = `${count} track${count !== 1 ? 's' : ''}`;
   if (nameEl) nameEl.textContent = name;
   if (countEl) countEl.textContent = countStr;
   if (mobileNameEl) mobileNameEl.textContent = name;
+  if (loopBtn) loopBtn.onclick = _togglePlaylistLoop;
   document.body.classList.add('playlist-open');
 
   // Update transport button labels to reflect prev/next role
@@ -428,12 +437,15 @@ function _openPanel(name, count) {
   if (mobileBtn) mobileBtn.onclick = _openMobileOverlay;
   if (mobileClose) mobileClose.onclick = _closeMobileOverlay;
 
+  _syncPlaylistLoopButton();
   _startPanelHeightSync();
 }
 
 function _closePanelUI() {
   _stopPanelHeightSync();
   document.body.classList.remove('playlist-open');
+  const loopBtn = $id('playlistLoopBtn');
+  if (loopBtn) loopBtn.onclick = null;
   const list = $id('playlistTrackList');
   if (list) list.innerHTML = '';
   const mobileList = $id('playlistMobileTrackList');
@@ -445,6 +457,21 @@ function _closePanelUI() {
   const endBtn = $id('endBtn');
   if (startBtn) { startBtn.title = 'Start'; startBtn.setAttribute('aria-label', 'Start'); }
   if (endBtn)   { endBtn.title = 'End';   endBtn.setAttribute('aria-label', 'End'); }
+  _syncPlaylistLoopButton();
+}
+
+function _togglePlaylistLoop() {
+  if (!ps.active) return;
+  ps.loopEnabled = !ps.loopEnabled;
+  _syncPlaylistLoopButton();
+}
+
+function _syncPlaylistLoopButton() {
+  const btn = $id('playlistLoopBtn');
+  if (!btn) return;
+  btn.classList.toggle('active', ps.loopEnabled);
+  btn.setAttribute('aria-pressed', ps.loopEnabled ? 'true' : 'false');
+  btn.title = ps.loopEnabled ? 'Loop Playlist On' : 'Loop Playlist Off';
 }
 
 function _openMobileOverlay() {
