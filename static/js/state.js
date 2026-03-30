@@ -54,6 +54,7 @@ export const settings = {
   defaultSpeed: 0.9,
   defaultReverb: 30,
   defaultDecay: 2,
+  playlistPreload: 5,
   loopEnabled: false,
   visualizerEnabled: true,
   artThemeEnabled: true,
@@ -62,3 +63,6 @@ export const settings = {
 export const SETTINGS_STORAGE_KEY = 'slowedReverbStudio.settings.v1';
 export const MIN_SPEED = 0.5;
 export const MAX_SPEED = 1.5;
+export const MIN_PLAYLIST_PRELOAD = 1;
+export const MAX_PLAYLIST_PRELOAD = 20;
+export const DEFAULT_PLAYLIST_PRELOAD = 5;

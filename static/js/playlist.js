@@ -1,11 +1,16 @@
 import { SERVER } from './config.js';
-import { state } from './state.js';
+import {
+  state,
+  settings,
+  MIN_PLAYLIST_PRELOAD,
+  MAX_PLAYLIST_PRELOAD,
+  DEFAULT_PLAYLIST_PRELOAD,
+} from './state.js';
 import { loadFile } from './loader.js';
 import { setOnTrackEnded, getCtx } from './audio.js';
 import { fmt, toast } from './utils.js';
 import { $id } from './dom.js';
 
-const AHEAD = 5;
 const BEHIND = 2;
 const MAX_RETRIES = 2;
 
@@ -68,7 +73,7 @@ export function initPlaylist(data, sourceUrl, { firstTrackPath = null } = {}) {
   if (curRow) { curRow.classList.add('is-playing'); curRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
   _updateRowStatus(0);
   setOnTrackEnded(_onTrackEnded);
-  _downloadNext(); // downloads tracks 1-5 in background (track 0 already ready)
+  _downloadNext(); // downloads upcoming tracks in background (track 0 already ready)
   _syncMobileBar();
 }
 
@@ -76,6 +81,12 @@ export function closePlaylist() {
   window.__playlistCloseHook = null;
   _teardown();
   _closePanelUI();
+}
+
+export function refreshPreloadWindow() {
+  if (!ps.active || ps.currentIndex < 0) return;
+  _evictOutsideWindow(ps.currentIndex);
+  _downloadNext();
 }
 
 export function jumpToTrack(index) {
@@ -122,20 +133,7 @@ function _setCurrentTrack(index) {
   const prev = ps.currentIndex;
   ps.currentIndex = index;
 
-  // Evict tracks that fall outside the window
-  for (let i = 0; i < ps.tracks.length; i++) {
-    const t = ps.tracks[i];
-    const inWindow = _isInRetentionWindow(i, index);
-    if (!inWindow && (t.status === 'ready') && t.filePath) {
-      // Fire-and-forget file cleanup
-      fetch(`${SERVER}/api/file?path=${encodeURIComponent(t.filePath)}&consume=1`).catch(() => {});
-      t.filePath = null;
-      t.status = 'evicted';
-      t.cachedArrayBuffer = null;
-      t.cachedDecodedBuffer = null;
-      _updateRowStatus(i);
-    }
-  }
+  _evictOutsideWindow(index);
 
   // Update sidebar highlighting
   if (prev >= 0) {
@@ -276,15 +274,17 @@ function _downloadNext() {
   // Build priority order: current first, then ahead, then behind.
   addCandidate(cur);
 
+  const aheadCount = _getAheadCount();
+
   if (ps.loopEnabled) {
-    for (let step = 1; step <= AHEAD; step++) {
+    for (let step = 1; step <= aheadCount; step++) {
       addCandidate((cur + step + total) % total);
     }
     for (let step = 1; step <= BEHIND; step++) {
       addCandidate((cur - step + total) % total);
     }
   } else {
-    for (let i = cur + 1; i <= Math.min(total - 1, cur + AHEAD); i++) {
+    for (let i = cur + 1; i <= Math.min(total - 1, cur + aheadCount); i++) {
       addCandidate(i);
     }
     for (let i = Math.max(0, cur - BEHIND); i < cur; i++) {
@@ -508,17 +508,40 @@ function _togglePlaylistLoop() {
   _downloadNext();
 }
 
+function _getAheadCount() {
+  const rounded = Math.round(Number(settings.playlistPreload));
+  if (!Number.isFinite(rounded)) return DEFAULT_PLAYLIST_PRELOAD;
+  return Math.min(MAX_PLAYLIST_PRELOAD, Math.max(MIN_PLAYLIST_PRELOAD, rounded));
+}
+
+function _evictOutsideWindow(currentIndex) {
+  for (let i = 0; i < ps.tracks.length; i++) {
+    const t = ps.tracks[i];
+    const inWindow = _isInRetentionWindow(i, currentIndex);
+    if (!inWindow && t.status === 'ready' && t.filePath) {
+      // Fire-and-forget file cleanup
+      fetch(`${SERVER}/api/file?path=${encodeURIComponent(t.filePath)}&consume=1`).catch(() => {});
+      t.filePath = null;
+      t.status = 'evicted';
+      t.cachedArrayBuffer = null;
+      t.cachedDecodedBuffer = null;
+      _updateRowStatus(i);
+    }
+  }
+}
+
 function _isInRetentionWindow(trackIndex, currentIndex) {
   const total = ps.tracks.length;
   if (total === 0) return false;
+  const aheadCount = _getAheadCount();
 
   if (!ps.loopEnabled) {
-    return trackIndex >= currentIndex - BEHIND && trackIndex <= currentIndex + AHEAD;
+    return trackIndex >= currentIndex - BEHIND && trackIndex <= currentIndex + aheadCount;
   }
 
   const aheadDistance = (trackIndex - currentIndex + total) % total;
   const behindDistance = (currentIndex - trackIndex + total) % total;
-  return aheadDistance <= AHEAD || behindDistance <= BEHIND;
+  return aheadDistance <= aheadCount || behindDistance <= BEHIND;
 }
 
 function _syncPlaylistLoopButton() {

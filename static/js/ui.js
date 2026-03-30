@@ -1,4 +1,10 @@
-import { state, settings } from './state.js';
+import {
+  state,
+  settings,
+  MIN_PLAYLIST_PRELOAD,
+  MAX_PLAYLIST_PRELOAD,
+  DEFAULT_PLAYLIST_PRELOAD,
+} from './state.js';
 import { clampSpeed, getExportSuffix, sanitize } from './utils.js';
 import {
   play, pause, seekTo, silenceForScrub,
@@ -21,7 +27,12 @@ import { doExport, closeModal } from './exporter.js';
 import { loadSettings, saveSettings, syncSettingsUI } from './settings.js';
 import { applyThemeFromCurrentTrack } from './theme.js';
 import { $id, setText, toggleClass } from './dom.js';
-import { jumpToTrack, isPlaylistActive, getCurrentIndex } from './playlist.js';
+import {
+  jumpToTrack,
+  isPlaylistActive,
+  getCurrentIndex,
+  refreshPreloadWindow,
+} from './playlist.js';
 import {
   syncSpeedControls,
   syncReverbControls,
@@ -276,6 +287,16 @@ $id('defaultDecay').addEventListener('change', e => {
     state.reverbDecay = settings.defaultDecay;
     syncDecayControls(settings.defaultDecay);
   }
+});
+$id('playlistPreloadCount').addEventListener('change', e => {
+  const rounded = Math.round(Number(e.target.value));
+  const next = Number.isFinite(rounded)
+    ? Math.min(MAX_PLAYLIST_PRELOAD, Math.max(MIN_PLAYLIST_PRELOAD, rounded))
+    : DEFAULT_PLAYLIST_PRELOAD;
+  settings.playlistPreload = next;
+  e.target.value = next;
+  saveSettings();
+  refreshPreloadWindow();
 });
 $id('bottomVisualizerToggle').addEventListener('change', e => {
   settings.visualizerEnabled = e.target.checked;
