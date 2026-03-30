@@ -38,7 +38,7 @@ export function initPlaylist(data, sourceUrl, { firstTrackPath = null } = {}) {
   _teardown();
 
   ps.active = true;
-  ps.loopEnabled = false;
+  ps.loopEnabled = true;
   ps.sourceUrl = sourceUrl;
   ps.tracks = (data.tracks || []).map((t, i) => ({
     index: i,
