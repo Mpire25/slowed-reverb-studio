@@ -222,8 +222,97 @@ function resetBarStages() {
   });
 }
 
+// ── Playlist detection ─────────────────────────────────────────
+function isPlaylistUrl(url) {
+  return (
+    /spotify\.com\/(album|playlist)\//i.test(url) ||
+    (/music\.youtube\.com/i.test(url) && /[?&]list=/i.test(url))
+  );
+}
+
+async function startPlaylistLoad(url) {
+  const {
+    urlLoadBtn: btn,
+    urlInput,
+    importStatus: statusEl,
+    importArt: artEl,
+    importTitle: titleEl,
+    importArtist: artistEl,
+    importStage: stageEl,
+    importTrackProgress: trackProgEl,
+    importTrackList: trackListEl,
+  } = $ids([
+    'urlLoadBtn', 'urlInput', 'importStatus', 'importArt',
+    'importTitle', 'importArtist', 'importStage',
+    'importTrackProgress', 'importTrackList',
+  ]);
+
+  const dropZone = $id('dropZone');
+  const dividerEl = document.querySelector('.url-divider');
+  const tabsEl = document.querySelector('.import-tabs');
+  const urlMode = $id('urlMode');
+  const searchModeEl = $id('searchMode');
+
+  state.importing = true;
+  dropZone.classList.add('load-hiding');
+  dividerEl.classList.add('load-hiding');
+  tabsEl.classList.add('load-hiding');
+  urlMode.classList.add('load-hiding');
+  btn.disabled = true;
+  urlInput.disabled = true;
+  btn.innerHTML = spinnerWithText('Loading…');
+
+  artEl.innerHTML = '🎵';
+  setText(titleEl, 'Fetching playlist…');
+  setText(artistEl, '');
+  setText(stageEl, '');
+  trackProgEl.classList.remove('visible');
+  trackListEl.classList.remove('visible');
+  setDisplay(statusEl, 'block');
+  statusEl.classList.remove('expanded', 'live');
+  requestAnimationFrame(() => statusEl.classList.add('live'));
+
+  function restoreAll() {
+    dropZone.classList.remove('load-hiding', 'ui-disabled');
+    dividerEl.classList.remove('load-hiding');
+    tabsEl.classList.remove('load-hiding', 'ui-disabled');
+    urlMode.classList.remove('load-hiding');
+    searchModeEl.classList.remove('load-hiding');
+    const searchActive = $id('tabSearch').classList.contains('active');
+    setDisplay(urlMode, searchActive ? 'none' : '');
+    setDisplay(searchModeEl, searchActive ? '' : 'none');
+    btn.disabled = false;
+    urlInput.disabled = false;
+    document.getElementById('searchInput').disabled = false;
+    state.importing = false;
+    setText(btn, 'Load');
+    statusEl.classList.remove('live', 'expanded');
+    setTimeout(() => setDisplay(statusEl, 'none'), 350);
+  }
+
+  try {
+    const res = await fetch(`${SERVER}/api/playlist/info?url=${encodeURIComponent(url)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to load playlist');
+
+    restoreAll();
+
+    const { initPlaylist } = await import('./playlist.js');
+    initPlaylist(data, url);
+    urlInput.value = '';
+  } catch (err) {
+    toast('Error: ' + err.message, 5000, 'error');
+    restoreAll();
+  }
+}
+
 // ── Shared SSE download flow ───────────────────────────────────
 function startDownload(url, prefill = null) {
+  if (isPlaylistUrl(url)) {
+    startPlaylistLoad(url);
+    return;
+  }
+
   const {
     urlLoadBtn: btn,
     urlInput,
@@ -424,7 +513,7 @@ function startDownload(url, prefill = null) {
       es.close();
       restoreInputs();
       setDisplay(statusEl, 'none');
-      toast("Albums and playlists aren't supported yet — paste a single track URL", 5000, 'error');
+      toast('Multi-track response received — paste a playlist URL to use playlist mode', 5000, 'error');
       return;
     }
     setText(artistEl, d.artist || '');

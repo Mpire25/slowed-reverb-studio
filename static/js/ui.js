@@ -21,6 +21,7 @@ import { doExport, closeModal } from './exporter.js';
 import { loadSettings, saveSettings, syncSettingsUI } from './settings.js';
 import { applyThemeFromCurrentTrack } from './theme.js';
 import { $id, setText, toggleClass } from './dom.js';
+import { jumpToTrack, isPlaylistActive, getCurrentIndex } from './playlist.js';
 import {
   syncSpeedControls,
   syncReverbControls,
@@ -299,5 +300,11 @@ document.addEventListener('keydown', e => {
     applyVolume();
     updateMuteBtn();
     updateVolumeTrack();
+  }
+  if (e.key === 'ArrowRight' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+    if (isPlaylistActive()) { e.preventDefault(); jumpToTrack(getCurrentIndex() + 1); }
+  }
+  if (e.key === 'ArrowLeft' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
+    if (isPlaylistActive()) { e.preventDefault(); jumpToTrack(getCurrentIndex() - 1); }
   }
 });

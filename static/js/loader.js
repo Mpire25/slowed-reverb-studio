@@ -77,7 +77,7 @@ export function updateSourceImportUI() {
   setDisplay($id('urlRow'), (!hasTrack && state.serverOnline) ? 'block' : 'none');
 }
 
-export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceLinks = null } = {}) {
+export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceLinks = null, suppressToast = false } = {}) {
   showLoading(true);
 
   // Reset effects to settings defaults so each song starts fresh
@@ -122,7 +122,7 @@ export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceL
     updateTrackUI();
     showPlayerUI(true);
     updateSourceImportUI();
-    toast('Track loaded', 3000, 'success');
+    if (!suppressToast) toast('Track loaded', 3000, 'success');
     if (autoPlay) play();
   } catch (err) {
     toast('Failed to decode audio: ' + err.message, 5000, 'error');
@@ -139,6 +139,7 @@ export function handleFileObject(file) {
 }
 
 export function resetStudio() {
+  if (window.__playlistCloseHook) window.__playlistCloseHook();
   stopActiveSource();
   resetAudioNodes();
   if (state.artBlob) { URL.revokeObjectURL(state.artBlob); state.artBlob = null; }

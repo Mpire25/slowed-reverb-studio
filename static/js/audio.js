@@ -1,4 +1,9 @@
 import { state } from './state.js';
+
+// Callback fired when a track ends naturally (not on pause/seek).
+// Set by playlist.js when a playlist is active; null otherwise.
+export let onTrackEndedCallback = null;
+export function setOnTrackEnded(cb) { onTrackEndedCallback = cb; }
 import {
   beginBottomVisualizerFade,
   clearBottomVisualizerFade,
@@ -110,6 +115,7 @@ function createSource(ctx, offset) {
       beginBottomVisualizerFade();
       updatePlayBtn();
       updateBottomVisualizerPlaybackState();
+      if (onTrackEndedCallback) onTrackEndedCallback();
     }
   };
   state.source = src;

@@ -7,6 +7,7 @@ Runs on port 7337. Provides SSE-based download streaming and file serving.
 import json
 import os
 import queue
+import re
 import threading
 import time
 from pathlib import Path
@@ -93,6 +94,121 @@ def search():
         return jsonify(out)
     except Exception as e:
         return jsonify({"error": clean_error_message(str(e))}), 500
+
+
+@app.route("/api/playlist/info")
+def playlist_info():
+    """
+    Fetch playlist metadata (no download).
+    Returns JSON: {name, type, image_url, tracks:[{index,name,artist,duration_ms,image_url,video_id?}]}
+    """
+    url = request.args.get("url", "").strip()
+    if not url:
+        return jsonify({"error": "No URL provided"}), 400
+
+    # Block regular YouTube playlists (not YouTube Music)
+    is_ytmusic = "music.youtube.com" in url and "list=" in url
+    is_yt_playlist = (
+        re.search(r'(youtube\.com|youtu\.be)', url)
+        and "list=" in url
+        and not is_ytmusic
+    )
+    if is_yt_playlist:
+        return jsonify({
+            "error": "Regular YouTube playlists aren't supported — use music.youtube.com"
+        }), 400
+
+    try:
+        from studio_downloader import (
+            get_youtube_playlist_tracks,
+            is_youtube_music_playlist,
+            _get_spotify_tracks,
+            _spotify_token,
+        )
+        if "spotify.com" in url:
+            token = _spotify_token()
+            tracks, meta = _get_spotify_tracks(url, token)
+            return jsonify({
+                "name": meta.get("name", ""),
+                "type": meta.get("type", "spotify_playlist"),
+                "image_url": meta.get("image_url"),
+                "tracks": [
+                    {
+                        "index": i,
+                        "name": t["name"],
+                        "artist": t.get("artist", ""),
+                        "album": t.get("album", ""),
+                        "duration_ms": t.get("duration_ms", 0),
+                        "image_url": t.get("image_url"),
+                    }
+                    for i, t in enumerate(tracks)
+                ],
+            })
+        elif is_youtube_music_playlist(url):
+            tracks, meta = get_youtube_playlist_tracks(url)
+            return jsonify({
+                "name": meta.get("name", "Playlist"),
+                "type": meta.get("type", "ytmusic_playlist"),
+                "image_url": meta.get("image_url"),
+                "tracks": tracks,
+            })
+        else:
+            return jsonify({"error": "URL is not a supported playlist"}), 400
+    except Exception as e:
+        return jsonify({"error": clean_error_message(str(e))}), 500
+
+
+@app.route("/api/download/track")
+def download_track():
+    """
+    SSE endpoint — download a single track by metadata JSON.
+    Query param: track_data (URL-encoded JSON with name, artist, album, duration_ms, image_url, video_id, index)
+    Emits same events as /api/download/stream: stage, progress, found, complete, error
+    """
+    track_data_str = request.args.get("track_data", "").strip()
+    if not track_data_str:
+        return jsonify({"error": "No track_data provided"}), 400
+
+    try:
+        track = json.loads(track_data_str)
+    except json.JSONDecodeError:
+        return jsonify({"error": "Invalid track_data JSON"}), 400
+
+    q = queue.Queue()
+
+    def on_event(event_type, data):
+        q.put((event_type, data))
+
+    def run():
+        try:
+            from studio_downloader import _download_track
+            mp3_path = _download_track(track, on_event)
+            on_event("complete", {
+                "file": str(mp3_path),
+                "title": track.get("name", ""),
+                "artist": track.get("artist", ""),
+            })
+        except Exception as e:
+            on_event("error", {"message": clean_error_message(str(e))})
+        finally:
+            q.put(None)
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+
+    def generate():
+        while True:
+            item = q.get()
+            if item is None:
+                break
+            event_type, data = item
+            yield _sse(event_type, data)
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.route("/api/download/stream")

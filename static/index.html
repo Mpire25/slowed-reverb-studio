@@ -263,6 +263,22 @@
   </div>
 </div>
 
+<!-- Playlist sidebar -->
+<div class="playlist-sidebar" id="playlistSidebar">
+  <div class="playlist-sidebar-header">
+    <div class="playlist-sidebar-meta">
+      <div class="playlist-sidebar-name" id="playlistSidebarName"></div>
+      <div class="playlist-sidebar-count" id="playlistSidebarCount"></div>
+    </div>
+    <button class="playlist-sidebar-close" id="playlistSidebarClose" title="Close playlist" aria-label="Close playlist">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+  </div>
+  <div class="playlist-track-list" id="playlistTrackList"></div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 <canvas id="bottomVisualizer" class="bottom-visualizer" aria-hidden="true"></canvas>
