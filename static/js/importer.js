@@ -325,9 +325,9 @@ async function startPlaylistLoad(url) {
     const totalTracks = data.tracks.length;
     const isSpotifySource = /spotify\.com/i.test(url);
 
-    // Update import card to show the first track + playlist context
+    // In playlist/album mode, title should represent the container, not track 1.
     completeBarStage('resolve');
-    setText(titleEl, firstTrack.name || 'Track 1');
+    setText(titleEl, data.name || firstTrack.name || 'Playlist');
     setText(artistEl, firstTrack.artist || '');
     if (firstTrack.image_url) {
       artEl.innerHTML = `<img src="${firstTrack.image_url}" alt="album art">`;
