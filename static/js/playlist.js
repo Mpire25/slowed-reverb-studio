@@ -80,19 +80,28 @@ export function closePlaylist() {
 
 export function jumpToTrack(index) {
   if (!ps.active) return;
-  if (index < 0 || index >= ps.tracks.length) return;
-  const track = ps.tracks[index];
+  if (ps.tracks.length === 0) return;
+
+  let targetIndex = index;
+  if (ps.loopEnabled) {
+    const total = ps.tracks.length;
+    targetIndex = ((index % total) + total) % total;
+  } else if (index < 0 || index >= ps.tracks.length) {
+    return;
+  }
+
+  const track = ps.tracks[targetIndex];
   if (!track) return;
 
   if (track.status === 'ready') {
-    _setCurrentTrack(index);
-    _loadAndPlayTrack(index);
+    _setCurrentTrack(targetIndex);
+    _loadAndPlayTrack(targetIndex);
   } else if (track.status === 'evicted') {
     track.status = 'pending';
     track.retries = 0;
     toast(`Loading "${track.name}"…`, 3000, 'info');
-    _setCurrentTrack(index);
-    _prioritizeAndDownload(index);
+    _setCurrentTrack(targetIndex);
+    _prioritizeAndDownload(targetIndex);
   } else {
     // pending / downloading / error
     if (track.status === 'error') {
@@ -102,8 +111,8 @@ export function jumpToTrack(index) {
     if (track.status !== 'downloading') {
       toast(`Loading "${track.name}"…`, 3000, 'info');
     }
-    _setCurrentTrack(index);
-    _prioritizeAndDownload(index);
+    _setCurrentTrack(targetIndex);
+    _prioritizeAndDownload(targetIndex);
   }
 }
 
@@ -116,7 +125,7 @@ function _setCurrentTrack(index) {
   // Evict tracks that fall outside the window
   for (let i = 0; i < ps.tracks.length; i++) {
     const t = ps.tracks[i];
-    const inWindow = i >= index - BEHIND && i <= index + AHEAD;
+    const inWindow = _isInRetentionWindow(i, index);
     if (!inWindow && (t.status === 'ready') && t.filePath) {
       // Fire-and-forget file cleanup
       fetch(`${SERVER}/api/file?path=${encodeURIComponent(t.filePath)}&consume=1`).catch(() => {});
@@ -241,14 +250,46 @@ function _downloadNext() {
   if (!ps.active) return;
   if (ps.activeES) return; // already downloading
 
+  const total = ps.tracks.length;
+  if (total === 0) return;
+
   const cur = ps.currentIndex;
-  // Build priority order: current first, then ahead, then behind
+  const seen = new Set();
   const candidates = [];
-  for (let i = cur; i <= Math.min(ps.tracks.length - 1, cur + AHEAD); i++) {
-    if (ps.tracks[i].status === 'pending') candidates.push(i);
-  }
-  for (let i = Math.max(0, cur - BEHIND); i < cur; i++) {
-    if (ps.tracks[i].status === 'pending') candidates.push(i);
+
+  const addCandidate = idx => {
+    if (idx < 0 || idx >= total || seen.has(idx)) return;
+    seen.add(idx);
+
+    const track = ps.tracks[idx];
+    if (!track) return;
+    if (track.status === 'evicted') {
+      track.status = 'pending';
+      track.retries = 0;
+      _updateRowStatus(idx);
+    }
+    if (track.status === 'pending') {
+      candidates.push(idx);
+    }
+  };
+
+  // Build priority order: current first, then ahead, then behind.
+  addCandidate(cur);
+
+  if (ps.loopEnabled) {
+    for (let step = 1; step <= AHEAD; step++) {
+      addCandidate((cur + step + total) % total);
+    }
+    for (let step = 1; step <= BEHIND; step++) {
+      addCandidate((cur - step + total) % total);
+    }
+  } else {
+    for (let i = cur + 1; i <= Math.min(total - 1, cur + AHEAD); i++) {
+      addCandidate(i);
+    }
+    for (let i = Math.max(0, cur - BEHIND); i < cur; i++) {
+      addCandidate(i);
+    }
   }
 
   if (candidates.length === 0) return;
@@ -464,6 +505,20 @@ function _togglePlaylistLoop() {
   if (!ps.active) return;
   ps.loopEnabled = !ps.loopEnabled;
   _syncPlaylistLoopButton();
+  _downloadNext();
+}
+
+function _isInRetentionWindow(trackIndex, currentIndex) {
+  const total = ps.tracks.length;
+  if (total === 0) return false;
+
+  if (!ps.loopEnabled) {
+    return trackIndex >= currentIndex - BEHIND && trackIndex <= currentIndex + AHEAD;
+  }
+
+  const aheadDistance = (trackIndex - currentIndex + total) % total;
+  const behindDistance = (currentIndex - trackIndex + total) % total;
+  return aheadDistance <= AHEAD || behindDistance <= BEHIND;
 }
 
 function _syncPlaylistLoopButton() {
