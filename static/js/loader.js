@@ -12,6 +12,14 @@ import { applyThemeFromCurrentTrack } from './theme.js';
 import { toast, fmt } from './utils.js';
 import { $id, toggleClass, setDisplay, setText } from './dom.js';
 
+function hasSameArtBytes(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 export function updateTrackUI() {
   setText($id('trackTitle'), state.title);
   setText($id('trackArtist'), state.artist);
@@ -32,6 +40,10 @@ export function updateTrackUI() {
   }
 
   const artEl = $id('albumArt');
+  const nextArtKey = state.artBlob || '__placeholder__';
+  if (artEl.dataset.artKey === nextArtKey) return;
+  artEl.dataset.artKey = nextArtKey;
+
   artEl.innerHTML = '';
   const placeholderEl = document.createElement('span');
   placeholderEl.className = 'album-art-placeholder';
@@ -97,11 +109,20 @@ export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceL
 
     if (tags['APIC']) {
       const { bytes, mime } = tags['APIC'];
-      state.artBytes = new Uint8Array(bytes);
+      const nextArtBytes = new Uint8Array(bytes);
+      const isSameArtwork =
+        !!state.artBlob &&
+        state.artMime === mime &&
+        hasSameArtBytes(state.artBytes, nextArtBytes);
+
+      state.artBytes = nextArtBytes;
       state.artMime = mime;
-      if (state.artBlob) URL.revokeObjectURL(state.artBlob);
-      state.artBlob = URL.createObjectURL(new Blob([bytes], { type: mime }));
+      if (!isSameArtwork) {
+        if (state.artBlob) URL.revokeObjectURL(state.artBlob);
+        state.artBlob = URL.createObjectURL(new Blob([bytes], { type: mime }));
+      }
     } else {
+      if (state.artBlob) URL.revokeObjectURL(state.artBlob);
       state.artBlob = null;
       state.artBytes = null;
       state.artMime = 'image/jpeg';

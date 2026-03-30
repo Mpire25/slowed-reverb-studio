@@ -239,12 +239,11 @@ async function startPlaylistLoad(url) {
     importTitle: titleEl,
     importArtist: artistEl,
     importStage: stageEl,
-    importTrackProgress: trackProgEl,
     importTrackList: trackListEl,
   } = $ids([
     'urlLoadBtn', 'urlInput', 'importStatus', 'importArt',
     'importTitle', 'importArtist', 'importStage',
-    'importTrackProgress', 'importTrackList',
+    'importTrackList',
   ]);
 
   const dropZone = $id('dropZone');
@@ -267,9 +266,7 @@ async function startPlaylistLoad(url) {
   setText(artistEl, '');
   setText(stageEl, '');
   resetBarStages();
-  setDisplay(trackProgEl, 'block');
   setDisplay(trackListEl, 'block');
-  trackProgEl.classList.remove('visible');
   trackListEl.classList.remove('visible');
   setDisplay(statusEl, 'block');
   statusEl.classList.remove('live');
@@ -322,7 +319,6 @@ async function startPlaylistLoad(url) {
     }
 
     const firstTrack = data.tracks[0];
-    const totalTracks = data.tracks.length;
     const isSpotifySource = /spotify\.com/i.test(url);
 
     // In playlist/album mode, title should represent the container, not track 1.
@@ -332,9 +328,6 @@ async function startPlaylistLoad(url) {
     if (firstTrack.image_url) {
       artEl.innerHTML = `<img src="${firstTrack.image_url}" alt="album art">`;
     }
-    // Show "Playlist name · Track 1 of N"
-    trackProgEl.textContent = `${data.name} · Track 1 of ${totalTracks}`;
-    trackProgEl.classList.add('visible');
 
     const trackData = {
       index: 0,
@@ -472,7 +465,6 @@ function startDownload(url, prefill = null) {
     importTitle: titleEl,
     importArtist: artistEl,
     importStage: stageEl,
-    importTrackProgress: trackProgEl,
     importTrackList: trackListEl,
   } = $ids([
     'urlLoadBtn',
@@ -482,7 +474,6 @@ function startDownload(url, prefill = null) {
     'importTitle',
     'importArtist',
     'importStage',
-    'importTrackProgress',
     'importTrackList',
   ]);
   let stageSwapTimer = null;
@@ -500,7 +491,6 @@ function startDownload(url, prefill = null) {
 
   const syncImportCardState = () => {
     const showTrackMeta =
-      trackProgEl.classList.contains('visible') ||
       trackListEl.classList.contains('visible') ||
       !!trackListEl.children.length;
     toggleClass(statusEl, 'expanded', showTrackMeta);
@@ -570,9 +560,7 @@ function startDownload(url, prefill = null) {
       setText(titleEl, 'Connecting…');
       setText(artistEl, '');
       setText(stageEl, '');
-      setDisplay(trackProgEl, 'block');
       setDisplay(trackListEl, 'block');
-      trackProgEl.classList.remove('visible');
       trackListEl.classList.remove('visible');
       trackListEl.innerHTML = '';
       syncImportCardState();
@@ -583,7 +571,6 @@ function startDownload(url, prefill = null) {
       return;
     }
     if (nextState === IMPORT_UI_STATE.PLAYLIST_PROGRESS) {
-      toggleClass(trackProgEl, 'visible', true);
       toggleClass(trackListEl, 'visible', true);
       syncImportCardState();
       return;
@@ -700,7 +687,6 @@ function startDownload(url, prefill = null) {
   es.addEventListener('track_start', e => {
     const d = JSON.parse(e.data);
     setImportUiState(IMPORT_UI_STATE.PLAYLIST_PROGRESS);
-    trackProgEl.textContent = `${d.artist} – ${d.title}`;
     const item = document.createElement('div');
     item.className = 'import-track-item active';
     item.id = `itrack-${d.index}`;

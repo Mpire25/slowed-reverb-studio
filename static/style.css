@@ -478,12 +478,6 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
   transition:opacity .18s ease,transform .22s cubic-bezier(.22,.61,.36,1)
 }
 .import-stage.updating{opacity:.2;transform:translateY(-2px)}
-.import-track-progress{
-  font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  max-height:0;opacity:0;transform:translateY(-3px);padding:0 14px;
-  transition:max-height .26s cubic-bezier(.22,.61,.36,1),padding .26s cubic-bezier(.22,.61,.36,1),opacity .24s ease,transform .24s cubic-bezier(.22,.61,.36,1)
-}
-.import-track-progress.visible{max-height:24px;opacity:.55;transform:translateY(0);padding:0 14px 4px}
 .import-stages-bar{display:flex;gap:5px;padding:0 20px 10px}
 .import-stage-seg{display:flex;flex-direction:column;gap:4px;flex:1}
 .import-stage-seg:nth-child(2){flex:2}
