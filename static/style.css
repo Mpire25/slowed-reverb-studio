@@ -627,7 +627,6 @@ body.playlist-open .playlist-mobile-bar{display:flex}
 @media(min-width:740px){
   .playlist-mobile-bar,.playlist-mobile-overlay{display:none!important}
   body.playlist-open .app-wrap{padding-bottom:0}
-  body.playlist-open .new-song-btn{right:calc(340px + 22px)}
 }
 @media(max-width:739px){
   body.playlist-open .app-wrap{padding-bottom:60px}
