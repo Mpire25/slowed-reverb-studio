@@ -327,25 +327,89 @@ def _convert_to_mp3(input_path, output_path, duration_s, on_event):
     Path(input_path).unlink(missing_ok=True)
 
 
+# ── YouTube Music playlist ─────────────────────────────────────────────────────
+
+def is_youtube_music_playlist(url):
+    """Returns True only for music.youtube.com playlist URLs (not plain YouTube)."""
+    return "music.youtube.com" in url and "list=" in url
+
+
+def get_youtube_playlist_tracks(url):
+    """
+    Fetch a YouTube Music playlist without downloading anything.
+    Returns (tracks_list, meta_dict) in the same shape as _get_spotify_tracks.
+    """
+    m = re.search(r'[?&]list=([A-Za-z0-9_-]+)', url)
+    if not m:
+        raise ValueError("No playlist ID found in URL")
+    playlist_id = m.group(1)
+
+    try:
+        ytm = _get_ytmusic()
+        data = ytm.get_playlist(playlist_id, limit=None)
+    except Exception as e:
+        raise RuntimeError(f"Could not fetch YouTube Music playlist: {e}") from e
+
+    tracks = []
+    for item in (data.get("tracks") or []):
+        video_id = item.get("videoId")
+        if not video_id:
+            continue
+        title = item.get("title") or "Unknown"
+        artists = item.get("artists") or []
+        artist = artists[0].get("name", "") if artists else (item.get("uploader") or "")
+        album_info = item.get("album") or {}
+        album = album_info.get("name", "") if isinstance(album_info, dict) else ""
+        thumbnails = item.get("thumbnails") or []
+        image_url = thumbnails[-1].get("url") if thumbnails else None
+        duration_seconds = item.get("duration_seconds") or 0
+        tracks.append({
+            "index": len(tracks),
+            "name": title,
+            "artist": artist,
+            "album": album,
+            "duration_ms": int(duration_seconds * 1000),
+            "image_url": image_url,
+            "video_id": video_id,
+        })
+
+    playlist_thumbnails = data.get("thumbnails") or []
+    playlist_image = playlist_thumbnails[-1].get("url") if playlist_thumbnails else (
+        tracks[0]["image_url"] if tracks else None
+    )
+    meta = {
+        "name": data.get("title") or "Playlist",
+        "type": "ytmusic_playlist",
+        "image_url": playlist_image,
+    }
+    return tracks, meta
+
+
 # ── Single track download (Spotify flow) ──────────────────────────────────────
 
 def _download_track(track, on_event):
     DOWNLOADS_DIR.mkdir(exist_ok=True)
     query = f"{track['artist']} - {track['name']}"
+    idx = track.get("index", 0)
     filename = safe_filename(query)
-    output = str(DOWNLOADS_DIR / f"{filename}.%(ext)s")
+    output = str(DOWNLOADS_DIR / f"{filename}_{idx}.%(ext)s")
     duration_s = (track.get("duration_ms") or 0) // 1000
 
-    on_event("stage", {"stage": "searching",
-                        "message": f"Searching YouTube Music for {query}…"})
-
-    video_id = _find_youtube_id(track)
-    if video_id:
-        source = f"https://www.youtube.com/watch?v={video_id}"
+    # If we already know the video ID (e.g. from a YTM playlist), skip search
+    known_video_id = track.get("video_id")
+    if known_video_id:
+        source = f"https://www.youtube.com/watch?v={known_video_id}"
         on_event("found", {"youtube_url": source, "query": query, "fallback": False})
     else:
-        source = f"ytsearch1:{query}"
-        on_event("found", {"youtube_url": None, "query": query, "fallback": True})
+        on_event("stage", {"stage": "searching",
+                            "message": f"Searching YouTube Music for {query}…"})
+        video_id = _find_youtube_id(track)
+        if video_id:
+            source = f"https://www.youtube.com/watch?v={video_id}"
+            on_event("found", {"youtube_url": source, "query": query, "fallback": False})
+        else:
+            source = f"ytsearch1:{query}"
+            on_event("found", {"youtube_url": None, "query": query, "fallback": True})
 
     on_event("stage", {"stage": "downloading", "message": "Downloading…"})
 
@@ -353,7 +417,7 @@ def _download_track(track, on_event):
     with yt_dlp.YoutubeDL(_make_ydl_opts(output, on_event, captured)) as ydl:
         ydl.download([source])
 
-    mp3_path = DOWNLOADS_DIR / f"{filename}.mp3"
+    mp3_path = DOWNLOADS_DIR / f"{filename}_{idx}.mp3"
     _convert_to_mp3(captured[0], mp3_path, duration_s, on_event)
 
     on_event("stage", {"stage": "embedding", "message": "Embedding metadata & art…"})

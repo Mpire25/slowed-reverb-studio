@@ -2,7 +2,11 @@ const idCache = new Map();
 export const SPINNER_HTML = '<span class="spinner"></span>';
 
 export function $id(id) {
-  if (idCache.has(id)) return idCache.get(id);
+  if (idCache.has(id)) {
+    const cached = idCache.get(id);
+    if (cached && cached.isConnected && cached.id === id) return cached;
+    idCache.delete(id);
+  }
   const el = document.getElementById(id);
   if (el) idCache.set(id, el);
   return el;

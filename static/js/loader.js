@@ -11,6 +11,15 @@ import {
 import { applyThemeFromCurrentTrack } from './theme.js';
 import { toast, fmt } from './utils.js';
 import { $id, toggleClass, setDisplay, setText } from './dom.js';
+import { updateMediaSessionMetadata, releaseMediaFocus } from './mediasession.js';
+
+function hasSameArtBytes(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
 
 export function updateTrackUI() {
   setText($id('trackTitle'), state.title);
@@ -32,6 +41,10 @@ export function updateTrackUI() {
   }
 
   const artEl = $id('albumArt');
+  const nextArtKey = state.artBlob || '__placeholder__';
+  if (artEl.dataset.artKey === nextArtKey) return;
+  artEl.dataset.artKey = nextArtKey;
+
   artEl.innerHTML = '';
   const placeholderEl = document.createElement('span');
   placeholderEl.className = 'album-art-placeholder';
@@ -77,16 +90,18 @@ export function updateSourceImportUI() {
   setDisplay($id('urlRow'), (!hasTrack && state.serverOnline) ? 'block' : 'none');
 }
 
-export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceLinks = null } = {}) {
+export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceLinks = null, suppressToast = false, keepEffects = false, preDecodedBuffer = null } = {}) {
   showLoading(true);
 
-  // Reset effects to settings defaults so each song starts fresh
-  state.speed = settings.defaultSpeed;
-  state.reverbMix = settings.defaultReverb / 100;
-  state.reverbDecay = settings.defaultDecay;
-  syncSpeedControls(state.speed);
-  syncReverbControls(state.reverbMix);
-  syncDecayControls(state.reverbDecay);
+  if (!keepEffects) {
+    // Reset effects to settings defaults so each song starts fresh
+    state.speed = settings.defaultSpeed;
+    state.reverbMix = settings.defaultReverb / 100;
+    state.reverbDecay = settings.defaultDecay;
+    syncSpeedControls(state.speed);
+    syncReverbControls(state.reverbMix);
+    syncDecayControls(state.reverbDecay);
+  }
 
   try {
     const tags = readID3(arrayBuffer);
@@ -95,11 +110,20 @@ export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceL
 
     if (tags['APIC']) {
       const { bytes, mime } = tags['APIC'];
-      state.artBytes = new Uint8Array(bytes);
+      const nextArtBytes = new Uint8Array(bytes);
+      const isSameArtwork =
+        !!state.artBlob &&
+        state.artMime === mime &&
+        hasSameArtBytes(state.artBytes, nextArtBytes);
+
+      state.artBytes = nextArtBytes;
       state.artMime = mime;
-      if (state.artBlob) URL.revokeObjectURL(state.artBlob);
-      state.artBlob = URL.createObjectURL(new Blob([bytes], { type: mime }));
+      if (!isSameArtwork) {
+        if (state.artBlob) URL.revokeObjectURL(state.artBlob);
+        state.artBlob = URL.createObjectURL(new Blob([bytes], { type: mime }));
+      }
     } else {
+      if (state.artBlob) URL.revokeObjectURL(state.artBlob);
       state.artBlob = null;
       state.artBytes = null;
       state.artMime = 'image/jpeg';
@@ -107,7 +131,7 @@ export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceL
 
     void applyThemeFromCurrentTrack();
 
-    const buf = await loadAudioBuffer(arrayBuffer);
+    const buf = preDecodedBuffer || await loadAudioBuffer(arrayBuffer);
     state.audioBuffer = buf;
     state.duration = buf.duration;
     state.pausedAt = 0;
@@ -120,9 +144,10 @@ export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceL
     state.sourceYouTubeUrl = sourceLinks?.youtube || null;
 
     updateTrackUI();
+    updateMediaSessionMetadata();
     showPlayerUI(true);
     updateSourceImportUI();
-    toast('Track loaded', 3000, 'success');
+    if (!suppressToast) toast('Track loaded', 3000, 'success');
     if (autoPlay) play();
   } catch (err) {
     toast('Failed to decode audio: ' + err.message, 5000, 'error');
@@ -139,6 +164,7 @@ export function handleFileObject(file) {
 }
 
 export function resetStudio() {
+  if (window.__playlistCloseHook) window.__playlistCloseHook();
   stopActiveSource();
   resetAudioNodes();
   if (state.artBlob) { URL.revokeObjectURL(state.artBlob); state.artBlob = null; }
@@ -171,5 +197,6 @@ export function resetStudio() {
   updateBottomVisualizerPlaybackState();
   void applyThemeFromCurrentTrack();
 
+  releaseMediaFocus();
   if (urlInput) urlInput.focus();
 }

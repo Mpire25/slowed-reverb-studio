@@ -1,4 +1,10 @@
-import { state, settings } from './state.js';
+import {
+  state,
+  settings,
+  MIN_PLAYLIST_PRELOAD,
+  MAX_PLAYLIST_PRELOAD,
+  DEFAULT_PLAYLIST_PRELOAD,
+} from './state.js';
 import { clampSpeed, getExportSuffix, sanitize } from './utils.js';
 import {
   play, pause, seekTo, silenceForScrub,
@@ -22,16 +28,40 @@ import { loadSettings, saveSettings, syncSettingsUI } from './settings.js';
 import { applyThemeFromCurrentTrack } from './theme.js';
 import { $id, setText, toggleClass } from './dom.js';
 import {
+  jumpToTrack,
+  isPlaylistActive,
+  getCurrentIndex,
+  refreshPreloadWindow,
+} from './playlist.js';
+import {
   syncSpeedControls,
   syncReverbControls,
   syncDecayControls,
   syncLoopButtonTitle,
 } from './controls.js';
+import { initMediaSession } from './mediasession.js';
 
 // ─── Init ────────────────────────────────────────────────────────────────────
 loadSettings();
 syncSettingsUI();
 initImporter();
+initMediaSession({
+  play: () => { if (state.audioBuffer) play(); },
+  pause: () => { if (state.audioBuffer) pause(); },
+  nexttrack: () => {
+    if (!state.audioBuffer) return;
+    if (isPlaylistActive()) jumpToTrack(getCurrentIndex() + 1);
+  },
+  previoustrack: () => {
+    if (!state.audioBuffer) return;
+    if (isPlaylistActive()) {
+      if (currentPosition() > 3) { seekTo(0); drawWaveform(); updateTimeDisplay(); }
+      else jumpToTrack(getCurrentIndex() - 1);
+    } else {
+      seekTo(0); drawWaveform(); updateTimeDisplay();
+    }
+  },
+});
 
 // ─── Effect Sliders ──────────────────────────────────────────────────────────
 $id('speedSlider').addEventListener('input', e => {
@@ -72,6 +102,15 @@ $id('playBtn').addEventListener('click', () => {
 
 $id('startBtn').addEventListener('click', () => {
   if (!state.audioBuffer) return;
+  if (isPlaylistActive()) {
+    // In playlist mode: go to previous track (or start of track if near beginning)
+    if (currentPosition() > 3) {
+      seekTo(0); drawWaveform(); updateTimeDisplay();
+    } else {
+      jumpToTrack(getCurrentIndex() - 1);
+    }
+    return;
+  }
   seekTo(0);
   drawWaveform();
   updateTimeDisplay();
@@ -79,6 +118,10 @@ $id('startBtn').addEventListener('click', () => {
 
 $id('endBtn').addEventListener('click', () => {
   if (!state.audioBuffer) return;
+  if (isPlaylistActive()) {
+    jumpToTrack(getCurrentIndex() + 1);
+    return;
+  }
   state.pausedAt = state.duration;
   if (state.source) {
     state.playing = false;
@@ -262,6 +305,16 @@ $id('defaultDecay').addEventListener('change', e => {
     state.reverbDecay = settings.defaultDecay;
     syncDecayControls(settings.defaultDecay);
   }
+});
+$id('playlistPreloadCount').addEventListener('change', e => {
+  const rounded = Math.round(Number(e.target.value));
+  const next = Number.isFinite(rounded)
+    ? Math.min(MAX_PLAYLIST_PRELOAD, Math.max(MIN_PLAYLIST_PRELOAD, rounded))
+    : DEFAULT_PLAYLIST_PRELOAD;
+  settings.playlistPreload = next;
+  e.target.value = next;
+  saveSettings();
+  refreshPreloadWindow();
 });
 $id('bottomVisualizerToggle').addEventListener('change', e => {
   settings.visualizerEnabled = e.target.checked;

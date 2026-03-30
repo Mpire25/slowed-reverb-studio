@@ -222,8 +222,15 @@ function resetBarStages() {
   });
 }
 
-// ── Shared SSE download flow ───────────────────────────────────
-function startDownload(url, prefill = null) {
+// ── Playlist detection ─────────────────────────────────────────
+function isPlaylistUrl(url) {
+  return (
+    /spotify\.com\/(album|playlist)\//i.test(url) ||
+    (/music\.youtube\.com/i.test(url) && /[?&]list=/i.test(url))
+  );
+}
+
+async function startPlaylistLoad(url) {
   const {
     urlLoadBtn: btn,
     urlInput,
@@ -232,7 +239,232 @@ function startDownload(url, prefill = null) {
     importTitle: titleEl,
     importArtist: artistEl,
     importStage: stageEl,
-    importTrackProgress: trackProgEl,
+    importTrackList: trackListEl,
+  } = $ids([
+    'urlLoadBtn', 'urlInput', 'importStatus', 'importArt',
+    'importTitle', 'importArtist', 'importStage',
+    'importTrackList',
+  ]);
+
+  const dropZone = $id('dropZone');
+  const dividerEl = document.querySelector('.url-divider');
+  const tabsEl = document.querySelector('.import-tabs');
+  const urlMode = $id('urlMode');
+  const searchModeEl = $id('searchMode');
+
+  state.importing = true;
+  dropZone.classList.add('load-hiding');
+  dividerEl.classList.add('load-hiding');
+  tabsEl.classList.add('load-hiding');
+  urlMode.classList.add('load-hiding');
+  btn.disabled = true;
+  urlInput.disabled = true;
+  btn.innerHTML = spinnerWithText('Loading…');
+
+  artEl.innerHTML = '🎵';
+  setText(titleEl, 'Fetching playlist…');
+  setText(artistEl, '');
+  setText(stageEl, '');
+  resetBarStages();
+  setDisplay(trackListEl, 'block');
+  trackListEl.classList.remove('visible');
+  setDisplay(statusEl, 'block');
+  statusEl.classList.remove('live');
+  statusEl.classList.add('expanded');
+  requestAnimationFrame(() => {
+    statusEl.classList.add('live');
+    advanceBarToStage('resolve');
+  });
+
+  function restoreInputsOnly() {
+    dropZone.classList.remove('load-hiding', 'ui-disabled');
+    dividerEl.classList.remove('load-hiding');
+    tabsEl.classList.remove('load-hiding', 'ui-disabled');
+    urlMode.classList.remove('load-hiding');
+    searchModeEl.classList.remove('load-hiding');
+    const searchActive = $id('tabSearch').classList.contains('active');
+    setDisplay(urlMode, searchActive ? 'none' : '');
+    setDisplay(searchModeEl, searchActive ? '' : 'none');
+    btn.disabled = false;
+    urlInput.disabled = false;
+    document.getElementById('searchInput').disabled = false;
+    state.importing = false;
+    setText(btn, 'Load');
+  }
+
+  function hideStatus() {
+    statusEl.classList.remove('live', 'expanded');
+    setTimeout(() => setDisplay(statusEl, 'none'), 350);
+  }
+
+  let stageSwapTimer = null;
+  const setImportStage = (text) => {
+    clearTimeout(stageSwapTimer);
+    stageEl.classList.add('updating');
+    stageSwapTimer = setTimeout(() => {
+      setText(stageEl, text || '');
+      stageEl.classList.remove('updating');
+    }, 120);
+  };
+
+  let firstES = null;
+
+  try {
+    const res = await fetch(`${SERVER}/api/playlist/info?url=${encodeURIComponent(url)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to load playlist');
+
+    if (!data.tracks || data.tracks.length === 0) {
+      throw new Error('Playlist is empty');
+    }
+
+    const firstTrack = data.tracks[0];
+    const isSpotifySource = /spotify\.com/i.test(url);
+
+    // In playlist/album mode, title should represent the container, not track 1.
+    completeBarStage('resolve');
+    setText(titleEl, data.name || firstTrack.name || 'Playlist');
+    setText(artistEl, firstTrack.artist || '');
+    if (firstTrack.image_url) {
+      artEl.innerHTML = `<img src="${firstTrack.image_url}" alt="album art">`;
+    }
+
+    const trackData = {
+      index: 0,
+      name: firstTrack.name,
+      artist: firstTrack.artist || '',
+      album: firstTrack.album || '',
+      duration_ms: firstTrack.duration_ms || 0,
+      image_url: firstTrack.image_url || null,
+      video_id: firstTrack.video_id || null,
+    };
+
+    firstES = new EventSource(
+      `${SERVER}/api/download/track?track_data=${encodeURIComponent(JSON.stringify(trackData))}`
+    );
+
+    firstES.addEventListener('stage', e => {
+      const d = JSON.parse(e.data);
+      const msg = (d.stage in STAGE_MESSAGES) ? STAGE_MESSAGES[d.stage] : d.message;
+      if (msg !== null) setImportStage(msg);
+      if (d.stage === 'converting') {
+        const idx = BAR_STAGES.indexOf('process');
+        for (let i = Math.max(0, barStageIndex); i < idx; i++) completeBarStage(BAR_STAGES[i]);
+        barStageIndex = idx;
+        setBarStageActive('process');
+      } else {
+        const barStage = SSE_TO_BAR_STAGE[d.stage];
+        if (barStage) advanceBarToStage(barStage);
+      }
+    });
+
+    firstES.addEventListener('found', e => {
+      const d = JSON.parse(e.data);
+      setImportStage(d.fallback ? 'No exact match — searching YouTube…' : 'Found on YouTube Music');
+      advanceBarToStage('download');
+    });
+
+    firstES.addEventListener('progress', e => {
+      const d = JSON.parse(e.data);
+      const seg = SSE_TO_BAR_STAGE[d.stage] || 'download';
+      setBarStageProgress(seg, d.percent);
+    });
+
+    firstES.addEventListener('complete', async e => {
+      firstES.close();
+      firstES = null;
+      const d = JSON.parse(e.data);
+      completeBarStage('process');
+      setImportStage('Loading into studio…');
+      setTimeout(() => advanceBarToStage('load'), 200);
+
+      try {
+        // Fetch WITHOUT consume — playlist.js manages the file lifetime
+        const fileRes = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(d.file)}`);
+        if (!fileRes.ok) throw new Error('Could not retrieve file');
+        const contentLength = parseInt(fileRes.headers.get('Content-Length') || '0', 10);
+        const reader = fileRes.body.getReader();
+        const chunks = [];
+        let received = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+          received += value.byteLength;
+          if (contentLength > 0) setBarStageProgress('load', Math.round((received / contentLength) * 100));
+        }
+        const ab = new Uint8Array(received);
+        let pos = 0;
+        for (const chunk of chunks) { ab.set(chunk, pos); pos += chunk.byteLength; }
+
+        const sourceLinks = {
+          spotify: isSpotifySource ? url : null,
+          youtube: isSpotifySource
+            ? (firstTrack.video_id ? `https://www.youtube.com/watch?v=${firstTrack.video_id}` : null)
+            : url,
+        };
+        await loadFile(ab.buffer, (firstTrack.name || 'track') + '.mp3', {
+          autoPlay: true,
+          sourceLinks,
+          suppressToast: true,
+        });
+        completeBarStage('load');
+        await new Promise(resolve => setTimeout(resolve, 220));
+        hideStatus();
+      } catch (err) {
+        setImportStage('✗ ' + err.message);
+        toast('Error loading track: ' + err.message, 5000, 'error');
+      }
+
+      restoreInputsOnly();
+      urlInput.value = '';
+
+      const { initPlaylist } = await import('./playlist.js');
+      initPlaylist(data, url, { firstTrackPath: d.file });
+    });
+
+    firstES.addEventListener('error', e => {
+      if (firstES) firstES.close();
+      firstES = null;
+      let msg = 'Download failed';
+      try { msg = JSON.parse(e.data).message; } catch {}
+      toast('Error: ' + msg, 5000, 'error');
+      restoreInputsOnly();
+      hideStatus();
+    });
+
+    firstES.onerror = () => {
+      if (!firstES || firstES.readyState === EventSource.CLOSED) return;
+      firstES.close();
+      firstES = null;
+      toast('Connection lost', 3000, 'error');
+      restoreInputsOnly();
+      hideStatus();
+    };
+
+  } catch (err) {
+    if (firstES) { firstES.close(); firstES = null; }
+    toast('Error: ' + err.message, 5000, 'error');
+    restoreInputsOnly();
+    hideStatus();
+  }
+}
+
+// ── Shared SSE download flow ───────────────────────────────────
+function startDownload(url, prefill = null) {
+  if (isPlaylistUrl(url)) {
+    startPlaylistLoad(url);
+    return;
+  }
+
+  const {
+    urlLoadBtn: btn,
+    urlInput,
+    importStatus: statusEl,
+    importArt: artEl,
+    importTitle: titleEl,
+    importArtist: artistEl,
+    importStage: stageEl,
     importTrackList: trackListEl,
   } = $ids([
     'urlLoadBtn',
@@ -242,7 +474,6 @@ function startDownload(url, prefill = null) {
     'importTitle',
     'importArtist',
     'importStage',
-    'importTrackProgress',
     'importTrackList',
   ]);
   let stageSwapTimer = null;
@@ -260,7 +491,6 @@ function startDownload(url, prefill = null) {
 
   const syncImportCardState = () => {
     const showTrackMeta =
-      trackProgEl.classList.contains('visible') ||
       trackListEl.classList.contains('visible') ||
       !!trackListEl.children.length;
     toggleClass(statusEl, 'expanded', showTrackMeta);
@@ -330,9 +560,7 @@ function startDownload(url, prefill = null) {
       setText(titleEl, 'Connecting…');
       setText(artistEl, '');
       setText(stageEl, '');
-      setDisplay(trackProgEl, 'block');
       setDisplay(trackListEl, 'block');
-      trackProgEl.classList.remove('visible');
       trackListEl.classList.remove('visible');
       trackListEl.innerHTML = '';
       syncImportCardState();
@@ -343,7 +571,6 @@ function startDownload(url, prefill = null) {
       return;
     }
     if (nextState === IMPORT_UI_STATE.PLAYLIST_PROGRESS) {
-      toggleClass(trackProgEl, 'visible', true);
       toggleClass(trackListEl, 'visible', true);
       syncImportCardState();
       return;
@@ -424,7 +651,7 @@ function startDownload(url, prefill = null) {
       es.close();
       restoreInputs();
       setDisplay(statusEl, 'none');
-      toast("Albums and playlists aren't supported yet — paste a single track URL", 5000, 'error');
+      toast('Multi-track response received — paste a playlist URL to use playlist mode', 5000, 'error');
       return;
     }
     setText(artistEl, d.artist || '');
@@ -460,7 +687,6 @@ function startDownload(url, prefill = null) {
   es.addEventListener('track_start', e => {
     const d = JSON.parse(e.data);
     setImportUiState(IMPORT_UI_STATE.PLAYLIST_PROGRESS);
-    trackProgEl.textContent = `${d.artist} – ${d.title}`;
     const item = document.createElement('div');
     item.className = 'import-track-item active';
     item.id = `itrack-${d.index}`;

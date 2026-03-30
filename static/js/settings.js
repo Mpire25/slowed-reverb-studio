@@ -1,4 +1,11 @@
-import { state, settings, SETTINGS_STORAGE_KEY } from './state.js';
+import {
+  state,
+  settings,
+  SETTINGS_STORAGE_KEY,
+  MIN_PLAYLIST_PRELOAD,
+  MAX_PLAYLIST_PRELOAD,
+  DEFAULT_PLAYLIST_PRELOAD,
+} from './state.js';
 import { clampSpeed } from './utils.js';
 import { setThemeCss } from './theme.js';
 import { $id } from './dom.js';
@@ -15,6 +22,12 @@ import {
 } from './visualizer.js';
 import { updateLoopBtn } from './audio.js';
 
+function clampPlaylistPreload(value) {
+  const rounded = Math.round(Number(value));
+  if (!Number.isFinite(rounded)) return DEFAULT_PLAYLIST_PRELOAD;
+  return Math.min(MAX_PLAYLIST_PRELOAD, Math.max(MIN_PLAYLIST_PRELOAD, rounded));
+}
+
 export function loadSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
@@ -24,6 +37,7 @@ export function loadSettings() {
     if (Number.isFinite(parsed.defaultSpeed)) settings.defaultSpeed = clampSpeed(parsed.defaultSpeed);
     if (Number.isFinite(parsed.defaultReverb)) settings.defaultReverb = parsed.defaultReverb;
     if (Number.isFinite(parsed.defaultDecay)) settings.defaultDecay = parsed.defaultDecay;
+    if (parsed.playlistPreload !== undefined) settings.playlistPreload = clampPlaylistPreload(parsed.playlistPreload);
     if (typeof parsed.loopEnabled === 'boolean') settings.loopEnabled = parsed.loopEnabled;
     if (typeof parsed.visualizerEnabled === 'boolean') settings.visualizerEnabled = parsed.visualizerEnabled;
     if (typeof parsed.artThemeEnabled === 'boolean') settings.artThemeEnabled = parsed.artThemeEnabled;
@@ -44,6 +58,8 @@ export function syncSettingsUI() {
   $id('defaultSpeed').value = settings.defaultSpeed;
   $id('defaultReverb').value = settings.defaultReverb;
   $id('defaultDecay').value = settings.defaultDecay;
+  settings.playlistPreload = clampPlaylistPreload(settings.playlistPreload);
+  $id('playlistPreloadCount').value = settings.playlistPreload;
   $id('bottomVisualizerToggle').checked = settings.visualizerEnabled;
   $id('artThemeToggle').checked = settings.artThemeEnabled;
 
