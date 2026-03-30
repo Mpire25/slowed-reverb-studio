@@ -169,6 +169,7 @@ async function _loadAndPlayTrack(index) {
       autoPlay: true,
       sourceLinks,
       suppressToast: true,
+      keepEffects: true,
     });
   } catch (err) {
     console.error('Failed to load playlist track:', err);

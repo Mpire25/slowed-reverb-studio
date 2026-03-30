@@ -77,16 +77,18 @@ export function updateSourceImportUI() {
   setDisplay($id('urlRow'), (!hasTrack && state.serverOnline) ? 'block' : 'none');
 }
 
-export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceLinks = null, suppressToast = false } = {}) {
+export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceLinks = null, suppressToast = false, keepEffects = false } = {}) {
   showLoading(true);
 
-  // Reset effects to settings defaults so each song starts fresh
-  state.speed = settings.defaultSpeed;
-  state.reverbMix = settings.defaultReverb / 100;
-  state.reverbDecay = settings.defaultDecay;
-  syncSpeedControls(state.speed);
-  syncReverbControls(state.reverbMix);
-  syncDecayControls(state.reverbDecay);
+  if (!keepEffects) {
+    // Reset effects to settings defaults so each song starts fresh
+    state.speed = settings.defaultSpeed;
+    state.reverbMix = settings.defaultReverb / 100;
+    state.reverbDecay = settings.defaultDecay;
+    syncSpeedControls(state.speed);
+    syncReverbControls(state.reverbMix);
+    syncDecayControls(state.reverbDecay);
+  }
 
   try {
     const tags = readID3(arrayBuffer);

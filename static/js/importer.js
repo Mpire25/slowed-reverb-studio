@@ -266,11 +266,18 @@ async function startPlaylistLoad(url) {
   setText(titleEl, 'Fetching playlist…');
   setText(artistEl, '');
   setText(stageEl, '');
+  resetBarStages();
+  setDisplay(trackProgEl, 'block');
+  setDisplay(trackListEl, 'block');
   trackProgEl.classList.remove('visible');
   trackListEl.classList.remove('visible');
   setDisplay(statusEl, 'block');
-  statusEl.classList.remove('expanded', 'live');
-  requestAnimationFrame(() => statusEl.classList.add('live'));
+  statusEl.classList.remove('live');
+  statusEl.classList.add('expanded');
+  requestAnimationFrame(() => {
+    statusEl.classList.add('live');
+    advanceBarToStage('resolve');
+  });
 
   function restoreInputsOnly() {
     dropZone.classList.remove('load-hiding', 'ui-disabled');
@@ -319,8 +326,6 @@ async function startPlaylistLoad(url) {
     const isSpotifySource = /spotify\.com/i.test(url);
 
     // Update import card to show the first track + playlist context
-    resetBarStages();
-    advanceBarToStage('resolve');
     completeBarStage('resolve');
     setText(titleEl, firstTrack.name || 'Track 1');
     setText(artistEl, firstTrack.artist || '');
@@ -330,7 +335,6 @@ async function startPlaylistLoad(url) {
     // Show "Playlist name · Track 1 of N"
     trackProgEl.textContent = `${data.name} · Track 1 of ${totalTracks}`;
     trackProgEl.classList.add('visible');
-    statusEl.classList.add('expanded');
 
     const trackData = {
       index: 0,
