@@ -1,13 +1,6 @@
 import { SERVER } from './config.js';
 import { SPINNER_HTML, setDisplay } from './dom.js';
-
-function escHtml(str) {
-  return String(str || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
+import { escapeHtml } from './utils.js';
 
 export function initImporterSearch({ searchModeEl, searchInputEl, resultsEl, onSelect }) {
   let searchTimer = null;
@@ -72,8 +65,8 @@ export function initImporterSearch({ searchModeEl, searchInputEl, resultsEl, onS
           ${item.thumbnail ? `<img src="${item.thumbnail}" alt="" loading="lazy">` : '🎵'}
         </div>
         <div class="search-result-info">
-          <div class="search-result-title">${escHtml(item.title)}</div>
-          <div class="search-result-meta">${escHtml(item.artist)}${item.duration ? ' · ' + escHtml(item.duration) : ''}</div>
+          <div class="search-result-title">${escapeHtml(item.title)}</div>
+          <div class="search-result-meta">${escapeHtml(item.artist)}${item.duration ? ' · ' + escapeHtml(item.duration) : ''}</div>
         </div>
       `;
       el.addEventListener('click', () => {

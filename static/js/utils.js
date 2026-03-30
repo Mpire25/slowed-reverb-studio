@@ -27,6 +27,14 @@ export function sanitize(s) {
   return s.replace(/[<>:"/\\|?*\x00-\x1f]/g, '').trim() || 'track';
 }
 
+export function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 export function toast(msg, ms = 3000, type = 'info') {
   const el = $id('toast');
   el.textContent = msg;

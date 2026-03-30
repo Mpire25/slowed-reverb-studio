@@ -1,13 +1,5 @@
-import { fmt } from './utils.js';
+import { fmt, escapeHtml } from './utils.js';
 import { $id } from './dom.js';
-
-function _esc(str) {
-  return String(str || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 function _makeTrackRow(track, onJumpToTrack) {
   const row = document.createElement('div');
@@ -18,11 +10,11 @@ function _makeTrackRow(track, onJumpToTrack) {
   row.innerHTML = `
     <span class="pl-row-num">${track.index + 1}</span>
     <div class="pl-row-art">
-      ${track.image_url ? `<img src="${_esc(track.image_url)}" loading="lazy" alt="">` : '<span class="pl-row-art-placeholder">♪</span>'}
+      ${track.image_url ? `<img src="${escapeHtml(track.image_url)}" loading="lazy" alt="">` : '<span class="pl-row-art-placeholder">♪</span>'}
     </div>
     <div class="pl-row-info">
-      <div class="pl-row-title">${_esc(track.name)}</div>
-      <div class="pl-row-artist">${_esc(track.artist)}</div>
+      <div class="pl-row-title">${escapeHtml(track.name)}</div>
+      <div class="pl-row-artist">${escapeHtml(track.artist)}</div>
     </div>
     <span class="pl-row-dur">${dur}</span>
     <span class="pl-row-status" id="pl-status-${track.index}"></span>

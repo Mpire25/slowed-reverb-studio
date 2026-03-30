@@ -12,11 +12,5 @@ export function createStageTextUpdater(stageEl, delayMs = 120) {
     }, delayMs);
   }
 
-  function clear() {
-    clearTimeout(stageSwapTimer);
-    stageSwapTimer = null;
-    stageEl.classList.remove('updating');
-  }
-
-  return { set, clear };
+  return { set };
 }
