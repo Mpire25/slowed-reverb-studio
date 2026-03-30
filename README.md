@@ -58,6 +58,10 @@ The gear icon (top right) opens settings to change default slider values.
 
 When the backend is running, a URL import field appears below the drop zone. Paste any YouTube video URL or Spotify track/album/playlist URL — the studio streams live download progress directly in the UI.
 
+Importing a Spotify album or a YouTube Music album/playlist opens a **playlist panel** alongside the studio. Tracks download progressively in the background; the studio auto-advances to the next track when one finishes. Use the **Prev/Next** transport buttons to skip, and toggle **Loop** to wrap back to the start. The number of tracks preloaded ahead can be adjusted in Settings.
+
+> Note: Spotify playlist URLs are not currently supported — use Spotify album URLs instead.
+
 ---
 
 ## Architecture
@@ -83,6 +87,7 @@ slowed-reverb-studio/
       exporter.js       — MP3 export
       settings.js       — settings persistence
       controls.js       — shared slider/loop UI sync helpers
+      playlist.js       — playlist state, panel UI, progressive download + auto-advance
       dom.js            — cached DOM lookup + UI utilities
       theme.js          — color extraction + CSS theming
       id3.js            — ID3v2 reader/writer
