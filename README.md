@@ -52,6 +52,8 @@ Then open **`http://localhost:7337`** in your browser.
 
 Keyboard shortcuts: `Space` to play/pause, `M` to toggle mute, `Shift+N` to reset/load a new track. Click the waveform to seek.
 
+OS media controls (keyboard media keys, headphone buttons, lock screen controls) are supported — play/pause and prev/next track work system-wide while the studio is open.
+
 The transport bar includes a **mute button** and **volume slider** for quick level control.
 
 The gear icon (top right) opens settings to change default slider values.
