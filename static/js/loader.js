@@ -77,7 +77,7 @@ export function updateSourceImportUI() {
   setDisplay($id('urlRow'), (!hasTrack && state.serverOnline) ? 'block' : 'none');
 }
 
-export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceLinks = null, suppressToast = false, keepEffects = false } = {}) {
+export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceLinks = null, suppressToast = false, keepEffects = false, preDecodedBuffer = null } = {}) {
   showLoading(true);
 
   if (!keepEffects) {
@@ -109,7 +109,7 @@ export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceL
 
     void applyThemeFromCurrentTrack();
 
-    const buf = await loadAudioBuffer(arrayBuffer);
+    const buf = preDecodedBuffer || await loadAudioBuffer(arrayBuffer);
     state.audioBuffer = buf;
     state.duration = buf.duration;
     state.pausedAt = 0;

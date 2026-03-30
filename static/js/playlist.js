@@ -1,7 +1,7 @@
 import { SERVER } from './config.js';
 import { state } from './state.js';
 import { loadFile } from './loader.js';
-import { setOnTrackEnded } from './audio.js';
+import { setOnTrackEnded, getCtx } from './audio.js';
 import { fmt, toast } from './utils.js';
 import { $id } from './dom.js';
 
@@ -44,6 +44,8 @@ export function initPlaylist(data, sourceUrl, { firstTrackPath = null } = {}) {
     filePath: null,
     status: 'pending',
     retries: 0,
+    cachedArrayBuffer: null,
+    cachedDecodedBuffer: null,
   }));
 
   // If the first track was already downloaded by importer, mark it ready
@@ -118,6 +120,8 @@ function _setCurrentTrack(index) {
       fetch(`${SERVER}/api/file?path=${encodeURIComponent(t.filePath)}&consume=1`).catch(() => {});
       t.filePath = null;
       t.status = 'evicted';
+      t.cachedArrayBuffer = null;
+      t.cachedDecodedBuffer = null;
       _updateRowStatus(i);
     }
   }
@@ -156,9 +160,18 @@ async function _loadAndPlayTrack(index) {
   ps.pendingPlayIndex = -1;
 
   try {
-    const res = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(track.filePath)}`);
-    if (!res.ok) throw new Error('Could not fetch track file');
-    const ab = await res.arrayBuffer();
+    let ab = track.cachedArrayBuffer;
+    const preDecoded = track.cachedDecodedBuffer;
+
+    if (!ab) {
+      const res = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(track.filePath)}`);
+      if (!res.ok) throw new Error('Could not fetch track file');
+      ab = await res.arrayBuffer();
+    }
+
+    // Consume the cache — no longer needed after handoff to loadFile
+    track.cachedArrayBuffer = null;
+    track.cachedDecodedBuffer = null;
 
     const sourceLinks = {
       spotify: /spotify/i.test(ps.sourceUrl) ? ps.sourceUrl : null,
@@ -170,9 +183,34 @@ async function _loadAndPlayTrack(index) {
       sourceLinks,
       suppressToast: true,
       keepEffects: true,
+      preDecodedBuffer: preDecoded || null,
     });
   } catch (err) {
     console.error('Failed to load playlist track:', err);
+  }
+}
+
+// ── Internal: pre-fetch / pre-decode ──────────────────────────────────────────
+
+async function _prefetchTrack(idx) {
+  const track = ps.tracks[idx];
+  if (!track || !track.filePath || track.cachedArrayBuffer || track.cachedDecodedBuffer) return;
+  try {
+    const res = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(track.filePath)}`);
+    if (!res.ok) return;
+    const ab = await res.arrayBuffer();
+    if (!ps.active || !ps.tracks[idx] || ps.tracks[idx].status !== 'ready') return; // evicted while fetching
+    track.cachedArrayBuffer = ab;
+    try {
+      const decoded = await getCtx().decodeAudioData(ab.slice(0));
+      if (ps.active && ps.tracks[idx] && ps.tracks[idx].status === 'ready') {
+        track.cachedDecodedBuffer = decoded;
+      }
+    } catch (e) {
+      // Pre-decode failed — will decode on demand
+    }
+  } catch (e) {
+    // Pre-fetch failed — will fetch on demand
   }
 }
 
@@ -250,6 +288,9 @@ function _startTrackDownload(idx) {
     if (ps.pendingPlayIndex === idx || (idx === ps.currentIndex && !_isAnyTrackPlaying())) {
       ps.pendingPlayIndex = -1;
       _loadAndPlayTrack(idx);
+    } else {
+      // Pre-fetch and pre-decode in the background so it's instant when needed
+      _prefetchTrack(idx);
     }
 
     _downloadNext();
@@ -308,11 +349,13 @@ function _teardown() {
     ps.activeES.close();
     ps.activeES = null;
   }
-  // Clean up any remaining downloaded files
+  // Clean up any remaining downloaded files and caches
   for (const t of ps.tracks) {
     if (t.filePath && t.status === 'ready') {
       fetch(`${SERVER}/api/file?path=${encodeURIComponent(t.filePath)}&consume=1`).catch(() => {});
     }
+    t.cachedArrayBuffer = null;
+    t.cachedDecodedBuffer = null;
   }
   ps.active = false;
   ps.tracks = [];
