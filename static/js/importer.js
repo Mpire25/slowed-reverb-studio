@@ -3,6 +3,8 @@ import { loadFile, updateSourceImportUI } from './loader.js';
 import { SERVER } from './config.js';
 import { toast } from './utils.js';
 import { $id, $ids, setDisplay, setText, toggleClass, SPINNER_HTML, spinnerWithText } from './dom.js';
+import { createImportProgressBar, STAGE_MESSAGES, SSE_TO_BAR_STAGE } from './importer_progress.js';
+import { createStageTextUpdater } from './importer_stage_text.js';
 
 export function initImporter() {
   const btn = $id('urlLoadBtn');
@@ -149,6 +151,8 @@ function escHtml(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+const progressBar = createImportProgressBar();
+
 const IMPORT_UI_STATE = {
   CONNECTING: 'connecting',
   LOADING: 'loading',
@@ -156,71 +160,6 @@ const IMPORT_UI_STATE = {
   ERROR: 'error',
   COMPLETE: 'complete',
 };
-
-// ── Stage message map ──────────────────────────────────────────
-const STAGE_MESSAGES = {
-  fetching_metadata: 'Finding track…',
-  searching:         'Searching YouTube Music…',
-  found:             null, // handled by `found` event
-  downloading:       'Downloading audio…',
-  converting:        'Converting to MP3…',
-  embedding:         'Adding track info…',
-};
-
-// ── 4-stage bar helpers ────────────────────────────────────────
-const SSE_TO_BAR_STAGE = {
-  fetching_metadata: 'resolve',
-  searching:         'resolve',
-  found:             'resolve',
-  downloading:       'download',
-  converting:        'process',
-  embedding:         'process',
-};
-const BAR_STAGES = ['resolve', 'download', 'process', 'load'];
-let barStageIndex = -1;
-const barStageProgress = Object.create(null);
-
-function advanceBarToStage(stageName) {
-  const idx = BAR_STAGES.indexOf(stageName);
-  if (idx < 0 || idx <= barStageIndex) return;
-  // Complete all earlier stages when we advance (e.g. resolve -> download).
-  for (let i = Math.max(0, barStageIndex); i < idx; i++) {
-    completeBarStage(BAR_STAGES[i]);
-  }
-  barStageIndex = idx;
-  setBarStageActive(stageName);
-}
-
-function setBarStageProgress(stageName, pct) {
-  const next = Math.max(0, Math.min(100, Number(pct) || 0));
-  const current = barStageProgress[stageName] || 0;
-  const clamped = Math.max(current, next); // Never let a stage visually move backwards.
-  barStageProgress[stageName] = clamped;
-  const el = $id('stageFill-' + stageName);
-  if (el) el.style.width = clamped + '%';
-}
-
-function completeBarStage(stageName) {
-  setBarStageProgress(stageName, 100);
-  const seg = $id('stageSeg-' + stageName);
-  if (seg) { seg.classList.remove('active'); seg.classList.add('done'); }
-}
-
-function setBarStageActive(stageName) {
-  const seg = $id('stageSeg-' + stageName);
-  if (seg) seg.classList.add('active');
-}
-
-function resetBarStages() {
-  barStageIndex = -1;
-  BAR_STAGES.forEach(s => {
-    barStageProgress[s] = 0;
-    const fill = $id('stageFill-' + s);
-    const seg  = $id('stageSeg-' + s);
-    if (fill) fill.style.width = '0%';
-    if (seg)  seg.classList.remove('active', 'done');
-  });
-}
 
 // ── Playlist detection ─────────────────────────────────────────
 function isPlaylistUrl(url) {
@@ -265,7 +204,7 @@ async function startPlaylistLoad(url) {
   setText(titleEl, 'Fetching playlist…');
   setText(artistEl, '');
   setText(stageEl, '');
-  resetBarStages();
+  progressBar.resetStages();
   setDisplay(trackListEl, 'block');
   trackListEl.classList.remove('visible');
   setDisplay(statusEl, 'block');
@@ -273,7 +212,7 @@ async function startPlaylistLoad(url) {
   statusEl.classList.add('expanded');
   requestAnimationFrame(() => {
     statusEl.classList.add('live');
-    advanceBarToStage('resolve');
+    progressBar.advanceToStage('resolve');
   });
 
   function restoreInputsOnly() {
@@ -297,15 +236,8 @@ async function startPlaylistLoad(url) {
     setTimeout(() => setDisplay(statusEl, 'none'), 350);
   }
 
-  let stageSwapTimer = null;
-  const setImportStage = (text) => {
-    clearTimeout(stageSwapTimer);
-    stageEl.classList.add('updating');
-    stageSwapTimer = setTimeout(() => {
-      setText(stageEl, text || '');
-      stageEl.classList.remove('updating');
-    }, 120);
-  };
+  const stageText = createStageTextUpdater(stageEl);
+  const setImportStage = text => stageText.set(text);
 
   let firstES = null;
 
@@ -322,7 +254,7 @@ async function startPlaylistLoad(url) {
     const isSpotifySource = /spotify\.com/i.test(url);
 
     // In playlist/album mode, title should represent the container, not track 1.
-    completeBarStage('resolve');
+    progressBar.completeStage('resolve');
     setText(titleEl, data.name || firstTrack.name || 'Playlist');
     setText(artistEl, firstTrack.artist || '');
     if (firstTrack.image_url) {
@@ -348,35 +280,32 @@ async function startPlaylistLoad(url) {
       const msg = (d.stage in STAGE_MESSAGES) ? STAGE_MESSAGES[d.stage] : d.message;
       if (msg !== null) setImportStage(msg);
       if (d.stage === 'converting') {
-        const idx = BAR_STAGES.indexOf('process');
-        for (let i = Math.max(0, barStageIndex); i < idx; i++) completeBarStage(BAR_STAGES[i]);
-        barStageIndex = idx;
-        setBarStageActive('process');
+        progressBar.completePriorAndActivate('process');
       } else {
         const barStage = SSE_TO_BAR_STAGE[d.stage];
-        if (barStage) advanceBarToStage(barStage);
+        if (barStage) progressBar.advanceToStage(barStage);
       }
     });
 
     firstES.addEventListener('found', e => {
       const d = JSON.parse(e.data);
       setImportStage(d.fallback ? 'No exact match — searching YouTube…' : 'Found on YouTube Music');
-      advanceBarToStage('download');
+      progressBar.advanceToStage('download');
     });
 
     firstES.addEventListener('progress', e => {
       const d = JSON.parse(e.data);
       const seg = SSE_TO_BAR_STAGE[d.stage] || 'download';
-      setBarStageProgress(seg, d.percent);
+      progressBar.setStageProgress(seg, d.percent);
     });
 
     firstES.addEventListener('complete', async e => {
       firstES.close();
       firstES = null;
       const d = JSON.parse(e.data);
-      completeBarStage('process');
+      progressBar.completeStage('process');
       setImportStage('Loading into studio…');
-      setTimeout(() => advanceBarToStage('load'), 200);
+      setTimeout(() => progressBar.advanceToStage('load'), 200);
 
       try {
         // Fetch WITHOUT consume — playlist.js manages the file lifetime
@@ -391,7 +320,7 @@ async function startPlaylistLoad(url) {
           if (done) break;
           chunks.push(value);
           received += value.byteLength;
-          if (contentLength > 0) setBarStageProgress('load', Math.round((received / contentLength) * 100));
+          if (contentLength > 0) progressBar.setStageProgress('load', Math.round((received / contentLength) * 100));
         }
         const ab = new Uint8Array(received);
         let pos = 0;
@@ -408,7 +337,7 @@ async function startPlaylistLoad(url) {
           sourceLinks,
           suppressToast: true,
         });
-        completeBarStage('load');
+        progressBar.completeStage('load');
         await new Promise(resolve => setTimeout(resolve, 220));
         hideStatus();
       } catch (err) {
@@ -476,18 +405,10 @@ function startDownload(url, prefill = null) {
     'importStage',
     'importTrackList',
   ]);
-  let stageSwapTimer = null;
+  progressBar.resetStages();
 
-  resetBarStages();
-
-  const setImportStage = (text) => {
-    clearTimeout(stageSwapTimer);
-    stageEl.classList.add('updating');
-    stageSwapTimer = setTimeout(() => {
-      setText(stageEl, text || '');
-      stageEl.classList.remove('updating');
-    }, 120);
-  };
+  const stageText = createStageTextUpdater(stageEl);
+  const setImportStage = text => stageText.set(text);
 
   const syncImportCardState = () => {
     const showTrackMeta =
@@ -601,8 +522,8 @@ function startDownload(url, prefill = null) {
     requestAnimationFrame(() => statusEl.classList.add('live'));
     cardShown = true;
     // Track already resolved via search — animate resolve bar to done
-    advanceBarToStage('resolve');
-    setTimeout(() => completeBarStage('resolve'), 300);
+    progressBar.advanceToStage('resolve');
+    setTimeout(() => progressBar.completeStage('resolve'), 300);
   }
   let foundYouTubeUrl = null;
   const isSpotifySource = /spotify\.com/i.test(url);
@@ -610,13 +531,13 @@ function startDownload(url, prefill = null) {
   // Activate resolve stage immediately so the bar is visibly non-zero.
   // scheduleBarProgress ensures fast SSE responses always animate FROM 8%
   // rather than skipping straight to a later value.
-  advanceBarToStage('resolve');
+  progressBar.advanceToStage('resolve');
   const barStartTime = Date.now();
   const BAR_ANIM_MIN_MS = 400;
   function scheduleBarProgress(stage, pct) {
     const wait = BAR_ANIM_MIN_MS - (Date.now() - barStartTime);
-    if (wait > 0) setTimeout(() => setBarStageProgress(stage, pct), wait);
-    else setBarStageProgress(stage, pct);
+    if (wait > 0) setTimeout(() => progressBar.setStageProgress(stage, pct), wait);
+    else progressBar.setStageProgress(stage, pct);
   }
 
   const es = new EventSource(`${SERVER}/api/download/stream?url=${encodeURIComponent(url)}`);
@@ -627,18 +548,15 @@ function startDownload(url, prefill = null) {
     if (msg !== null) setImportStage(msg);
 
     if (d.stage === 'fetching_metadata') {
-      advanceBarToStage('resolve');
-      setBarStageProgress('resolve', 10);
+      progressBar.advanceToStage('resolve');
+      progressBar.setStageProgress('resolve', 10);
     } else if (d.stage === 'converting') {
       // Complete prior stages and activate process, but don't set a fake
       // initial value — real ffmpeg progress events will fill it from 0.
-      const idx = BAR_STAGES.indexOf('process');
-      for (let i = Math.max(0, barStageIndex); i < idx; i++) completeBarStage(BAR_STAGES[i]);
-      barStageIndex = idx;
-      setBarStageActive('process');
+      progressBar.completePriorAndActivate('process');
     } else {
       const barStage = SSE_TO_BAR_STAGE[d.stage];
-      if (barStage) advanceBarToStage(barStage);
+      if (barStage) progressBar.advanceToStage(barStage);
     }
   });
 
@@ -673,14 +591,14 @@ function startDownload(url, prefill = null) {
     setImportStage(d.fallback
       ? 'No exact match — searching YouTube…'
       : 'Found on YouTube Music');
-    advanceBarToStage('resolve');
-    completeBarStage('resolve');
+    progressBar.advanceToStage('resolve');
+    progressBar.completeStage('resolve');
   });
 
   es.addEventListener('progress', e => {
     const d = JSON.parse(e.data);
     const seg = SSE_TO_BAR_STAGE[d.stage] || 'download';
-    setBarStageProgress(seg, d.percent);
+    progressBar.setStageProgress(seg, d.percent);
   });
 
   /* PLAYLIST CODE — preserved for future use, currently disabled
@@ -722,10 +640,10 @@ function startDownload(url, prefill = null) {
     es.close();
     const d = JSON.parse(e.data);
     const file = d.file || completedFile;
-    completeBarStage('process');
+    progressBar.completeStage('process');
     setImportStage('Loading into studio…');
     setTimeout(() => {
-      advanceBarToStage('load');
+      progressBar.advanceToStage('load');
     }, 200);
     try {
       const fileRes = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(file)}&consume=1`);
@@ -741,10 +659,10 @@ function startDownload(url, prefill = null) {
         chunks.push(value);
         received += value.byteLength;
         if (contentLength > 0) {
-          setBarStageProgress('load', Math.round((received / contentLength) * 100));
+          progressBar.setStageProgress('load', Math.round((received / contentLength) * 100));
         } else {
           unknownLenProgress = Math.min(92, unknownLenProgress + 6);
-          setBarStageProgress('load', unknownLenProgress);
+          progressBar.setStageProgress('load', unknownLenProgress);
         }
       }
       const ab = new Uint8Array(received);
@@ -755,7 +673,7 @@ function startDownload(url, prefill = null) {
         youtube: isSpotifySource ? foundYouTubeUrl : url,
       };
       await loadFile(ab.buffer, completedTitle + '.mp3', { sourceLinks });
-      completeBarStage('load');
+      progressBar.completeStage('load');
       await new Promise(resolve => setTimeout(resolve, 220));
       urlInput.value = '';
       hideImportStatus();
