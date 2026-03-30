@@ -6,6 +6,7 @@ import { $id, $ids, setDisplay, setText, toggleClass, spinnerWithText } from './
 import { createImportProgressBar, STAGE_MESSAGES, SSE_TO_BAR_STAGE } from './importer_progress.js';
 import { createStageTextUpdater } from './importer_stage_text.js';
 import { initImporterSearch } from './importer_search.js';
+import { createImporterView } from './importer_view.js';
 
 export function initImporter() {
   const btn = $id('urlLoadBtn');
@@ -80,7 +81,6 @@ const progressBar = createImportProgressBar();
 const IMPORT_UI_STATE = {
   CONNECTING: 'connecting',
   LOADING: 'loading',
-  PLAYLIST_PROGRESS: 'playlist-progress',
   ERROR: 'error',
   COMPLETE: 'complete',
 };
@@ -139,26 +139,19 @@ async function startPlaylistLoad(url) {
     progressBar.advanceToStage('resolve');
   });
 
-  function restoreInputsOnly() {
-    dropZone.classList.remove('load-hiding', 'ui-disabled');
-    dividerEl.classList.remove('load-hiding');
-    tabsEl.classList.remove('load-hiding', 'ui-disabled');
-    urlMode.classList.remove('load-hiding');
-    searchModeEl.classList.remove('load-hiding');
-    const searchActive = $id('tabSearch').classList.contains('active');
-    setDisplay(urlMode, searchActive ? 'none' : '');
-    setDisplay(searchModeEl, searchActive ? '' : 'none');
-    btn.disabled = false;
-    urlInput.disabled = false;
-    document.getElementById('searchInput').disabled = false;
-    state.importing = false;
-    setText(btn, 'Load');
-  }
-
-  function hideStatus() {
-    statusEl.classList.remove('live', 'expanded');
-    setTimeout(() => setDisplay(statusEl, 'none'), 350);
-  }
+  const view = createImporterView({
+    dropZone,
+    dividerEl,
+    tabsEl,
+    urlModeEl: urlMode,
+    searchModeEl,
+    searchInputEl: /** @type {HTMLInputElement} */ (document.getElementById('searchInput')),
+    loadBtn: /** @type {HTMLButtonElement} */ (btn),
+    urlInput: /** @type {HTMLInputElement} */ (urlInput),
+    statusEl,
+    getSearchActive: () => $id('tabSearch').classList.contains('active'),
+    setImporting: next => { state.importing = next; },
+  });
 
   const stageText = createStageTextUpdater(stageEl);
   const setImportStage = text => stageText.set(text);
@@ -263,13 +256,13 @@ async function startPlaylistLoad(url) {
         });
         progressBar.completeStage('load');
         await new Promise(resolve => setTimeout(resolve, 220));
-        hideStatus();
+        view.hideStatus();
       } catch (err) {
         setImportStage('✗ ' + err.message);
         toast('Error loading track: ' + err.message, 5000, 'error');
       }
 
-      restoreInputsOnly();
+      view.restoreInputs();
       urlInput.value = '';
 
       const { initPlaylist } = await import('./playlist.js');
@@ -282,8 +275,8 @@ async function startPlaylistLoad(url) {
       let msg = 'Download failed';
       try { msg = JSON.parse(e.data).message; } catch {}
       toast('Error: ' + msg, 5000, 'error');
-      restoreInputsOnly();
-      hideStatus();
+      view.restoreInputs();
+      view.hideStatus();
     });
 
     firstES.onerror = () => {
@@ -291,15 +284,15 @@ async function startPlaylistLoad(url) {
       firstES.close();
       firstES = null;
       toast('Connection lost', 3000, 'error');
-      restoreInputsOnly();
-      hideStatus();
+      view.restoreInputs();
+      view.hideStatus();
     };
 
   } catch (err) {
     if (firstES) { firstES.close(); firstES = null; }
     toast('Error: ' + err.message, 5000, 'error');
-    restoreInputsOnly();
-    hideStatus();
+    view.restoreInputs();
+    view.hideStatus();
   }
 }
 
@@ -347,7 +340,21 @@ function startDownload(url, prefill = null) {
   const tabsEl = document.querySelector('.import-tabs');
   const urlMode = $id('urlMode');
   const searchModeEl = $id('searchMode');
+  const searchInputEl = /** @type {HTMLInputElement} */ (document.getElementById('searchInput'));
   const searchActive = $id('tabSearch').classList.contains('active');
+  const view = createImporterView({
+    dropZone,
+    dividerEl,
+    tabsEl,
+    urlModeEl: urlMode,
+    searchModeEl,
+    searchInputEl,
+    loadBtn: /** @type {HTMLButtonElement} */ (btn),
+    urlInput: /** @type {HTMLInputElement} */ (urlInput),
+    statusEl,
+    getSearchActive: () => searchActive,
+    setImporting: next => { state.importing = next; },
+  });
 
   let confirmed = false;
   let cardShown = false;
@@ -369,26 +376,6 @@ function startDownload(url, prefill = null) {
       requestAnimationFrame(() => statusEl.classList.add('live'));
       cardShown = true;
     }
-  }
-
-  function restoreInputs() {
-    dropZone.classList.remove('load-hiding', 'ui-disabled');
-    dividerEl.classList.remove('load-hiding');
-    tabsEl.classList.remove('load-hiding', 'ui-disabled');
-    urlMode.classList.remove('load-hiding');
-    searchModeEl.classList.remove('load-hiding');
-    setDisplay(urlMode, searchActive ? 'none' : '');
-    setDisplay(searchModeEl, searchActive ? '' : 'none');
-    btn.disabled = false;
-    urlInput.disabled = false;
-    document.getElementById('searchInput').disabled = false;
-    state.importing = false;
-    setText(btn, 'Load');
-  }
-
-  function hideImportStatus() {
-    statusEl.classList.remove('live', 'expanded');
-    setTimeout(() => { setDisplay(statusEl, 'none'); }, 350);
   }
 
   // Lock all input surfaces immediately
@@ -415,18 +402,13 @@ function startDownload(url, prefill = null) {
       showLoadingCardIfNeeded();
       return;
     }
-    if (nextState === IMPORT_UI_STATE.PLAYLIST_PROGRESS) {
-      toggleClass(trackListEl, 'visible', true);
-      syncImportCardState();
-      return;
-    }
     if (nextState === IMPORT_UI_STATE.COMPLETE) {
-      restoreInputs();
+      view.restoreInputs();
       return;
     }
     if (nextState === IMPORT_UI_STATE.ERROR) {
-      if (cardShown) hideImportStatus();
-      restoreInputs();
+      if (cardShown) view.hideStatus();
+      view.restoreInputs();
       return;
     }
   }
@@ -491,7 +473,7 @@ function startDownload(url, prefill = null) {
     setText(titleEl, completedTitle);
     if (d.total_tracks > 1) {
       es.close();
-      restoreInputs();
+      view.restoreInputs();
       setDisplay(statusEl, 'none');
       toast('Multi-track response received — paste a playlist URL to use playlist mode', 5000, 'error');
       return;
@@ -524,41 +506,6 @@ function startDownload(url, prefill = null) {
     const seg = SSE_TO_BAR_STAGE[d.stage] || 'download';
     progressBar.setStageProgress(seg, d.percent);
   });
-
-  /* PLAYLIST CODE — preserved for future use, currently disabled
-  es.addEventListener('track_start', e => {
-    const d = JSON.parse(e.data);
-    setImportUiState(IMPORT_UI_STATE.PLAYLIST_PROGRESS);
-    const item = document.createElement('div');
-    item.className = 'import-track-item active';
-    item.id = `itrack-${d.index}`;
-    item.innerHTML = `<span class="import-track-num">${d.index + 1}</span>${d.artist} – ${d.title}`;
-    trackListEl.appendChild(item);
-    item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    syncImportCardState();
-  });
-
-  es.addEventListener('track_complete', e => {
-    const d = JSON.parse(e.data);
-    completedFile = d.file;
-    const item = $id(`itrack-${d.index}`);
-    if (item) {
-      item.className = 'import-track-item done';
-      item.innerHTML = `<span class="import-track-check">✓</span>${d.artist} – ${d.title}`;
-    }
-    syncImportCardState();
-  });
-
-  es.addEventListener('track_error', e => {
-    const d = JSON.parse(e.data);
-    const item = $id(`itrack-${d.index}`);
-    if (item) {
-      item.className = 'import-track-item done';
-      item.innerHTML = `<span class="import-track-err">✗</span>${d.title}`;
-    }
-    syncImportCardState();
-  });
-  */
 
   es.addEventListener('complete', async e => {
     es.close();
@@ -600,7 +547,7 @@ function startDownload(url, prefill = null) {
       progressBar.completeStage('load');
       await new Promise(resolve => setTimeout(resolve, 220));
       urlInput.value = '';
-      hideImportStatus();
+      view.hideStatus();
     } catch (err) {
       setImportStage('✗ ' + err.message);
       toast('Error: ' + err.message, 5000, 'error');
