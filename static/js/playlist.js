@@ -533,10 +533,20 @@ function _openMobileOverlay() {
   const overlay = $id('playlistMobileOverlay');
   if (!overlay) return;
   overlay.classList.add('open');
-  // Sync the mobile list from the main list
+  // Sync the mobile list from the main list without duplicating IDs.
+  // Duplicate IDs can break global lookups used by status updates.
   const mainList = $id('playlistTrackList');
   const mobileList = $id('playlistMobileTrackList');
-  if (mainList && mobileList) mobileList.innerHTML = mainList.innerHTML;
+  if (mainList && mobileList) {
+    mobileList.innerHTML = '';
+    for (const row of mainList.querySelectorAll('.pl-row')) {
+      const clone = row.cloneNode(true);
+      clone.removeAttribute('id');
+      clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+      mobileList.appendChild(clone);
+    }
+  }
+  if (!mobileList) return;
   // Re-attach click handlers to mobile rows
   mobileList.querySelectorAll('.pl-row').forEach(row => {
     row.addEventListener('click', () => {
