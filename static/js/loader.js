@@ -11,7 +11,7 @@ import {
 import { applyThemeFromCurrentTrack } from './theme.js';
 import { toast, fmt } from './utils.js';
 import { $id, toggleClass, setDisplay, setText } from './dom.js';
-import { updateMediaSessionMetadata } from './mediasession.js';
+import { updateMediaSessionMetadata, releaseMediaFocus } from './mediasession.js';
 
 function hasSameArtBytes(a, b) {
   if (!a || !b || a.length !== b.length) return false;
@@ -197,5 +197,6 @@ export function resetStudio() {
   updateBottomVisualizerPlaybackState();
   void applyThemeFromCurrentTrack();
 
+  releaseMediaFocus();
   if (urlInput) urlInput.focus();
 }
