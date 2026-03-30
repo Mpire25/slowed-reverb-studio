@@ -7,6 +7,7 @@ import { createImportProgressBar, STAGE_MESSAGES, SSE_TO_BAR_STAGE } from './imp
 import { createStageTextUpdater } from './importer_stage_text.js';
 import { initImporterSearch } from './importer_search.js';
 import { createImporterView } from './importer_view.js';
+import { openImportStream } from './importer_stream.js';
 
 export function initImporter() {
   const btn = $id('urlLoadBtn');
@@ -156,7 +157,7 @@ async function startPlaylistLoad(url) {
   const stageText = createStageTextUpdater(stageEl);
   const setImportStage = text => stageText.set(text);
 
-  let firstES = null;
+  let firstStream = null;
 
   try {
     const res = await fetch(`${SERVER}/api/playlist/info?url=${encodeURIComponent(url)}`);
@@ -188,108 +189,95 @@ async function startPlaylistLoad(url) {
       video_id: firstTrack.video_id || null,
     };
 
-    firstES = new EventSource(
-      `${SERVER}/api/download/track?track_data=${encodeURIComponent(JSON.stringify(trackData))}`
-    );
+    firstStream = openImportStream({
+      url: `${SERVER}/api/download/track?track_data=${encodeURIComponent(JSON.stringify(trackData))}`,
+      events: {
+        stage: (d) => {
+          const msg = (d.stage in STAGE_MESSAGES) ? STAGE_MESSAGES[d.stage] : d.message;
+          if (msg !== null) setImportStage(msg);
+          if (d.stage === 'converting') {
+            progressBar.completePriorAndActivate('process');
+          } else {
+            const barStage = SSE_TO_BAR_STAGE[d.stage];
+            if (barStage) progressBar.advanceToStage(barStage);
+          }
+        },
+        found: (d) => {
+          setImportStage(d.fallback ? 'No exact match — searching YouTube…' : 'Found on YouTube Music');
+          progressBar.advanceToStage('download');
+        },
+        progress: (d) => {
+          const seg = SSE_TO_BAR_STAGE[d.stage] || 'download';
+          progressBar.setStageProgress(seg, d.percent);
+        },
+        complete: async (d, close) => {
+          close();
+          firstStream = null;
+          progressBar.completeStage('process');
+          setImportStage('Loading into studio…');
+          setTimeout(() => progressBar.advanceToStage('load'), 200);
 
-    firstES.addEventListener('stage', e => {
-      const d = JSON.parse(e.data);
-      const msg = (d.stage in STAGE_MESSAGES) ? STAGE_MESSAGES[d.stage] : d.message;
-      if (msg !== null) setImportStage(msg);
-      if (d.stage === 'converting') {
-        progressBar.completePriorAndActivate('process');
-      } else {
-        const barStage = SSE_TO_BAR_STAGE[d.stage];
-        if (barStage) progressBar.advanceToStage(barStage);
-      }
-    });
+          try {
+            // Fetch WITHOUT consume — playlist.js manages the file lifetime
+            const fileRes = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(d.file)}`);
+            if (!fileRes.ok) throw new Error('Could not retrieve file');
+            const contentLength = parseInt(fileRes.headers.get('Content-Length') || '0', 10);
+            const reader = fileRes.body.getReader();
+            const chunks = [];
+            let received = 0;
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              chunks.push(value);
+              received += value.byteLength;
+              if (contentLength > 0) progressBar.setStageProgress('load', Math.round((received / contentLength) * 100));
+            }
+            const ab = new Uint8Array(received);
+            let pos = 0;
+            for (const chunk of chunks) { ab.set(chunk, pos); pos += chunk.byteLength; }
 
-    firstES.addEventListener('found', e => {
-      const d = JSON.parse(e.data);
-      setImportStage(d.fallback ? 'No exact match — searching YouTube…' : 'Found on YouTube Music');
-      progressBar.advanceToStage('download');
-    });
+            const sourceLinks = {
+              spotify: isSpotifySource ? url : null,
+              youtube: isSpotifySource
+                ? (firstTrack.video_id ? `https://www.youtube.com/watch?v=${firstTrack.video_id}` : null)
+                : url,
+            };
+            await loadFile(ab.buffer, (firstTrack.name || 'track') + '.mp3', {
+              autoPlay: true,
+              sourceLinks,
+              suppressToast: true,
+            });
+            progressBar.completeStage('load');
+            await new Promise(resolve => setTimeout(resolve, 220));
+            view.hideStatus();
+          } catch (err) {
+            setImportStage('✗ ' + err.message);
+            toast('Error loading track: ' + err.message, 5000, 'error');
+          }
 
-    firstES.addEventListener('progress', e => {
-      const d = JSON.parse(e.data);
-      const seg = SSE_TO_BAR_STAGE[d.stage] || 'download';
-      progressBar.setStageProgress(seg, d.percent);
-    });
+          view.restoreInputs();
+          urlInput.value = '';
 
-    firstES.addEventListener('complete', async e => {
-      firstES.close();
-      firstES = null;
-      const d = JSON.parse(e.data);
-      progressBar.completeStage('process');
-      setImportStage('Loading into studio…');
-      setTimeout(() => progressBar.advanceToStage('load'), 200);
-
-      try {
-        // Fetch WITHOUT consume — playlist.js manages the file lifetime
-        const fileRes = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(d.file)}`);
-        if (!fileRes.ok) throw new Error('Could not retrieve file');
-        const contentLength = parseInt(fileRes.headers.get('Content-Length') || '0', 10);
-        const reader = fileRes.body.getReader();
-        const chunks = [];
-        let received = 0;
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          chunks.push(value);
-          received += value.byteLength;
-          if (contentLength > 0) progressBar.setStageProgress('load', Math.round((received / contentLength) * 100));
-        }
-        const ab = new Uint8Array(received);
-        let pos = 0;
-        for (const chunk of chunks) { ab.set(chunk, pos); pos += chunk.byteLength; }
-
-        const sourceLinks = {
-          spotify: isSpotifySource ? url : null,
-          youtube: isSpotifySource
-            ? (firstTrack.video_id ? `https://www.youtube.com/watch?v=${firstTrack.video_id}` : null)
-            : url,
-        };
-        await loadFile(ab.buffer, (firstTrack.name || 'track') + '.mp3', {
-          autoPlay: true,
-          sourceLinks,
-          suppressToast: true,
-        });
-        progressBar.completeStage('load');
-        await new Promise(resolve => setTimeout(resolve, 220));
+          const { initPlaylist } = await import('./playlist.js');
+          initPlaylist(data, url, { firstTrackPath: d.file });
+        },
+      },
+      onServerError: (msg) => {
+        firstStream = null;
+        const message = msg || 'Download failed';
+        toast('Error: ' + message, 5000, 'error');
+        view.restoreInputs();
         view.hideStatus();
-      } catch (err) {
-        setImportStage('✗ ' + err.message);
-        toast('Error loading track: ' + err.message, 5000, 'error');
-      }
-
-      view.restoreInputs();
-      urlInput.value = '';
-
-      const { initPlaylist } = await import('./playlist.js');
-      initPlaylist(data, url, { firstTrackPath: d.file });
+      },
+      onConnectionLost: () => {
+        firstStream = null;
+        toast('Connection lost', 3000, 'error');
+        view.restoreInputs();
+        view.hideStatus();
+      },
     });
-
-    firstES.addEventListener('error', e => {
-      if (firstES) firstES.close();
-      firstES = null;
-      let msg = 'Download failed';
-      try { msg = JSON.parse(e.data).message; } catch {}
-      toast('Error: ' + msg, 5000, 'error');
-      view.restoreInputs();
-      view.hideStatus();
-    });
-
-    firstES.onerror = () => {
-      if (!firstES || firstES.readyState === EventSource.CLOSED) return;
-      firstES.close();
-      firstES = null;
-      toast('Connection lost', 3000, 'error');
-      view.restoreInputs();
-      view.hideStatus();
-    };
-
   } catch (err) {
-    if (firstES) { firstES.close(); firstES = null; }
+    if (firstStream) { firstStream.close(); firstStream = null; }
     toast('Error: ' + err.message, 5000, 'error');
     view.restoreInputs();
     view.hideStatus();
@@ -415,7 +403,6 @@ function startDownload(url, prefill = null) {
 
   setImportUiState(IMPORT_UI_STATE.CONNECTING);
 
-  let completedFile = null;
   let completedTitle = 'track';
 
   if (prefill) {
@@ -446,128 +433,116 @@ function startDownload(url, prefill = null) {
     else progressBar.setStageProgress(stage, pct);
   }
 
-  const es = new EventSource(`${SERVER}/api/download/stream?url=${encodeURIComponent(url)}`);
+  openImportStream({
+    url: `${SERVER}/api/download/stream?url=${encodeURIComponent(url)}`,
+    events: {
+      stage: (d) => {
+        const msg = (d.stage in STAGE_MESSAGES) ? STAGE_MESSAGES[d.stage] : d.message;
+        if (msg !== null) setImportStage(msg);
 
-  es.addEventListener('stage', e => {
-    const d = JSON.parse(e.data);
-    const msg = (d.stage in STAGE_MESSAGES) ? STAGE_MESSAGES[d.stage] : d.message;
-    if (msg !== null) setImportStage(msg);
-
-    if (d.stage === 'fetching_metadata') {
-      progressBar.advanceToStage('resolve');
-      progressBar.setStageProgress('resolve', 10);
-    } else if (d.stage === 'converting') {
-      // Complete prior stages and activate process, but don't set a fake
-      // initial value — real ffmpeg progress events will fill it from 0.
-      progressBar.completePriorAndActivate('process');
-    } else {
-      const barStage = SSE_TO_BAR_STAGE[d.stage];
-      if (barStage) progressBar.advanceToStage(barStage);
-    }
-  });
-
-  es.addEventListener('metadata', e => {
-    setImportUiState(IMPORT_UI_STATE.LOADING);
-    const d = JSON.parse(e.data);
-    completedTitle = d.name || d.title || 'track';
-    setText(titleEl, completedTitle);
-    if (d.total_tracks > 1) {
-      es.close();
-      view.restoreInputs();
-      setDisplay(statusEl, 'none');
-      toast('Multi-track response received — paste a playlist URL to use playlist mode', 5000, 'error');
-      return;
-    }
-    setText(artistEl, d.artist || '');
-    if (d.image_url) {
-      artEl.innerHTML = `<img src="${d.image_url}" alt="album art">`;
-    }
-
-    if (isSpotifySource) {
-      scheduleBarProgress('resolve', 40);
-    } else {
-      scheduleBarProgress('resolve', 100);
-    }
-  });
-
-  es.addEventListener('found', e => {
-    setImportUiState(IMPORT_UI_STATE.LOADING);
-    const d = JSON.parse(e.data);
-    foundYouTubeUrl = d.youtube_url || foundYouTubeUrl;
-    setImportStage(d.fallback
-      ? 'No exact match — searching YouTube…'
-      : 'Found on YouTube Music');
-    progressBar.advanceToStage('resolve');
-    progressBar.completeStage('resolve');
-  });
-
-  es.addEventListener('progress', e => {
-    const d = JSON.parse(e.data);
-    const seg = SSE_TO_BAR_STAGE[d.stage] || 'download';
-    progressBar.setStageProgress(seg, d.percent);
-  });
-
-  es.addEventListener('complete', async e => {
-    es.close();
-    const d = JSON.parse(e.data);
-    const file = d.file || completedFile;
-    progressBar.completeStage('process');
-    setImportStage('Loading into studio…');
-    setTimeout(() => {
-      progressBar.advanceToStage('load');
-    }, 200);
-    try {
-      const fileRes = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(file)}&consume=1`);
-      if (!fileRes.ok) throw new Error('Could not retrieve file');
-      const contentLength = parseInt(fileRes.headers.get('Content-Length') || '0', 10);
-      const reader = fileRes.body.getReader();
-      const chunks = [];
-      let received = 0;
-      let unknownLenProgress = 8;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-        received += value.byteLength;
-        if (contentLength > 0) {
-          progressBar.setStageProgress('load', Math.round((received / contentLength) * 100));
+        if (d.stage === 'fetching_metadata') {
+          progressBar.advanceToStage('resolve');
+          progressBar.setStageProgress('resolve', 10);
+        } else if (d.stage === 'converting') {
+          // Complete prior stages and activate process, but don't set a fake
+          // initial value — real ffmpeg progress events will fill it from 0.
+          progressBar.completePriorAndActivate('process');
         } else {
-          unknownLenProgress = Math.min(92, unknownLenProgress + 6);
-          progressBar.setStageProgress('load', unknownLenProgress);
+          const barStage = SSE_TO_BAR_STAGE[d.stage];
+          if (barStage) progressBar.advanceToStage(barStage);
         }
-      }
-      const ab = new Uint8Array(received);
-      let pos = 0;
-      for (const chunk of chunks) { ab.set(chunk, pos); pos += chunk.byteLength; }
-      const sourceLinks = {
-        spotify: isSpotifySource ? url : null,
-        youtube: isSpotifySource ? foundYouTubeUrl : url,
-      };
-      await loadFile(ab.buffer, completedTitle + '.mp3', { sourceLinks });
-      progressBar.completeStage('load');
-      await new Promise(resolve => setTimeout(resolve, 220));
-      urlInput.value = '';
-      view.hideStatus();
-    } catch (err) {
-      setImportStage('✗ ' + err.message);
-      toast('Error: ' + err.message, 5000, 'error');
-    } finally {
-      setImportUiState(IMPORT_UI_STATE.COMPLETE);
-    }
-  });
+      },
+      metadata: (d, close) => {
+        setImportUiState(IMPORT_UI_STATE.LOADING);
+        completedTitle = d.name || d.title || 'track';
+        setText(titleEl, completedTitle);
+        if (d.total_tracks > 1) {
+          close();
+          view.restoreInputs();
+          setDisplay(statusEl, 'none');
+          toast('Multi-track response received — paste a playlist URL to use playlist mode', 5000, 'error');
+          return;
+        }
+        setText(artistEl, d.artist || '');
+        if (d.image_url) {
+          artEl.innerHTML = `<img src="${d.image_url}" alt="album art">`;
+        }
 
-  es.addEventListener('error', e => {
-    es.close();
-    let msg = 'Download failed';
-    try { msg = JSON.parse(e.data).message; } catch {}
-    toast('Error: ' + msg, 5000, 'error');
-    setImportUiState(IMPORT_UI_STATE.ERROR);
+        if (isSpotifySource) {
+          scheduleBarProgress('resolve', 40);
+        } else {
+          scheduleBarProgress('resolve', 100);
+        }
+      },
+      found: (d) => {
+        setImportUiState(IMPORT_UI_STATE.LOADING);
+        foundYouTubeUrl = d.youtube_url || foundYouTubeUrl;
+        setImportStage(d.fallback
+          ? 'No exact match — searching YouTube…'
+          : 'Found on YouTube Music');
+        progressBar.advanceToStage('resolve');
+        progressBar.completeStage('resolve');
+      },
+      progress: (d) => {
+        const seg = SSE_TO_BAR_STAGE[d.stage] || 'download';
+        progressBar.setStageProgress(seg, d.percent);
+      },
+      complete: async (d, close) => {
+        close();
+        const file = d.file;
+        progressBar.completeStage('process');
+        setImportStage('Loading into studio…');
+        setTimeout(() => {
+          progressBar.advanceToStage('load');
+        }, 200);
+        try {
+          const fileRes = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(file)}&consume=1`);
+          if (!fileRes.ok) throw new Error('Could not retrieve file');
+          const contentLength = parseInt(fileRes.headers.get('Content-Length') || '0', 10);
+          const reader = fileRes.body.getReader();
+          const chunks = [];
+          let received = 0;
+          let unknownLenProgress = 8;
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            chunks.push(value);
+            received += value.byteLength;
+            if (contentLength > 0) {
+              progressBar.setStageProgress('load', Math.round((received / contentLength) * 100));
+            } else {
+              unknownLenProgress = Math.min(92, unknownLenProgress + 6);
+              progressBar.setStageProgress('load', unknownLenProgress);
+            }
+          }
+          const ab = new Uint8Array(received);
+          let pos = 0;
+          for (const chunk of chunks) { ab.set(chunk, pos); pos += chunk.byteLength; }
+          const sourceLinks = {
+            spotify: isSpotifySource ? url : null,
+            youtube: isSpotifySource ? foundYouTubeUrl : url,
+          };
+          await loadFile(ab.buffer, completedTitle + '.mp3', { sourceLinks });
+          progressBar.completeStage('load');
+          await new Promise(resolve => setTimeout(resolve, 220));
+          urlInput.value = '';
+          view.hideStatus();
+        } catch (err) {
+          setImportStage('✗ ' + err.message);
+          toast('Error: ' + err.message, 5000, 'error');
+        } finally {
+          setImportUiState(IMPORT_UI_STATE.COMPLETE);
+        }
+      },
+    },
+    onServerError: (msg) => {
+      const message = msg || 'Download failed';
+      toast('Error: ' + message, 5000, 'error');
+      setImportUiState(IMPORT_UI_STATE.ERROR);
+    },
+    onConnectionLost: () => {
+      toast('Connection lost', 3000, 'error');
+      setImportUiState(IMPORT_UI_STATE.ERROR);
+    },
   });
-
-  es.onerror = () => {
-    if (es.readyState === EventSource.CLOSED) return;
-    es.close();
-    toast('Connection lost', 3000, 'error');
-    setImportUiState(IMPORT_UI_STATE.ERROR);
-  };
 }
