@@ -20,6 +20,7 @@ const ps = {
   downloadingIndex: -1,
   pendingPlayIndex: -1,  // track index waiting on a download before playing
 };
+let panelHeightObserver = null;
 
 // ── Public API ─────────────────────────────────────────────────────────────────
 
@@ -322,6 +323,45 @@ function _teardown() {
 
 // ── Internal: panel UI ─────────────────────────────────────────────────────────
 
+function _syncPanelHeightToApp() {
+  const app = document.querySelector('.app');
+  const panel = $id('playlistPanel');
+  if (!app || !panel) return;
+
+  const appStyles = window.getComputedStyle(app);
+  const paddingTop = parseFloat(appStyles.paddingTop) || 0;
+  const paddingBottom = parseFloat(appStyles.paddingBottom) || 0;
+  const appHeight = app.getBoundingClientRect().height;
+  const contentHeight = Math.max(0, Math.round(appHeight - paddingTop - paddingBottom));
+
+  panel.style.height = contentHeight > 0 ? `${contentHeight}px` : '';
+}
+
+function _startPanelHeightSync() {
+  _stopPanelHeightSync();
+  _syncPanelHeightToApp();
+  window.addEventListener('resize', _syncPanelHeightToApp);
+
+  if (typeof ResizeObserver !== 'undefined') {
+    const app = document.querySelector('.app');
+    if (app) {
+      panelHeightObserver = new ResizeObserver(_syncPanelHeightToApp);
+      panelHeightObserver.observe(app);
+    }
+  }
+}
+
+function _stopPanelHeightSync() {
+  window.removeEventListener('resize', _syncPanelHeightToApp);
+  if (panelHeightObserver) {
+    panelHeightObserver.disconnect();
+    panelHeightObserver = null;
+  }
+
+  const panel = $id('playlistPanel');
+  if (panel) panel.style.height = '';
+}
+
 function _openPanel(name, count) {
   const nameEl = $id('playlistSidebarName');
   const countEl = $id('playlistSidebarCount');
@@ -343,9 +383,12 @@ function _openPanel(name, count) {
   const mobileClose = $id('playlistMobileOverlayClose');
   if (mobileBtn) mobileBtn.onclick = _openMobileOverlay;
   if (mobileClose) mobileClose.onclick = _closeMobileOverlay;
+
+  _startPanelHeightSync();
 }
 
 function _closePanelUI() {
+  _stopPanelHeightSync();
   document.body.classList.remove('playlist-open');
   const list = $id('playlistTrackList');
   if (list) list.innerHTML = '';
