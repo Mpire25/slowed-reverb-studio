@@ -39,11 +39,29 @@ import {
   syncDecayControls,
   syncLoopButtonTitle,
 } from './controls.js';
+import { initMediaSession } from './mediasession.js';
 
 // ─── Init ────────────────────────────────────────────────────────────────────
 loadSettings();
 syncSettingsUI();
 initImporter();
+initMediaSession({
+  play: () => { if (state.audioBuffer) play(); },
+  pause: () => { if (state.audioBuffer) pause(); },
+  nexttrack: () => {
+    if (!state.audioBuffer) return;
+    if (isPlaylistActive()) jumpToTrack(getCurrentIndex() + 1);
+  },
+  previoustrack: () => {
+    if (!state.audioBuffer) return;
+    if (isPlaylistActive()) {
+      if (currentPosition() > 3) { seekTo(0); drawWaveform(); updateTimeDisplay(); }
+      else jumpToTrack(getCurrentIndex() - 1);
+    } else {
+      seekTo(0); drawWaveform(); updateTimeDisplay();
+    }
+  },
+});
 
 // ─── Effect Sliders ──────────────────────────────────────────────────────────
 $id('speedSlider').addEventListener('input', e => {

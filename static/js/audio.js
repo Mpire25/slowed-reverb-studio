@@ -1,4 +1,5 @@
 import { state } from './state.js';
+import { updateMediaSessionPlaybackState } from './mediasession.js';
 
 // Callback fired when a track ends naturally (not on pause/seek).
 // Set by playlist.js when a playlist is active; null otherwise.
@@ -115,6 +116,7 @@ function createSource(ctx, offset) {
       beginBottomVisualizerFade();
       updatePlayBtn();
       updateBottomVisualizerPlaybackState();
+      updateMediaSessionPlaybackState(false);
       if (onTrackEndedCallback) onTrackEndedCallback();
     }
   };
@@ -141,6 +143,7 @@ export function play() {
   createSource(ctx, state.pausedAt);
   updatePlayBtn();
   startAnimLoop();
+  updateMediaSessionPlaybackState(true);
 }
 
 export function pause() {
@@ -151,6 +154,7 @@ export function pause() {
   updatePlayBtn();
   stopActiveSource();
   updateBottomVisualizerPlaybackState();
+  updateMediaSessionPlaybackState(false);
 }
 
 export function seekTo(fraction) {

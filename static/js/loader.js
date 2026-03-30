@@ -11,6 +11,7 @@ import {
 import { applyThemeFromCurrentTrack } from './theme.js';
 import { toast, fmt } from './utils.js';
 import { $id, toggleClass, setDisplay, setText } from './dom.js';
+import { updateMediaSessionMetadata } from './mediasession.js';
 
 function hasSameArtBytes(a, b) {
   if (!a || !b || a.length !== b.length) return false;
@@ -143,6 +144,7 @@ export async function loadFile(arrayBuffer, filename, { autoPlay = true, sourceL
     state.sourceYouTubeUrl = sourceLinks?.youtube || null;
 
     updateTrackUI();
+    updateMediaSessionMetadata();
     showPlayerUI(true);
     updateSourceImportUI();
     if (!suppressToast) toast('Track loaded', 3000, 'success');
