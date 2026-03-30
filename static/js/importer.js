@@ -272,7 +272,7 @@ async function startPlaylistLoad(url) {
   statusEl.classList.remove('expanded', 'live');
   requestAnimationFrame(() => statusEl.classList.add('live'));
 
-  function restoreAll() {
+  function restoreInputsOnly() {
     dropZone.classList.remove('load-hiding', 'ui-disabled');
     dividerEl.classList.remove('load-hiding');
     tabsEl.classList.remove('load-hiding', 'ui-disabled');
@@ -286,23 +286,170 @@ async function startPlaylistLoad(url) {
     document.getElementById('searchInput').disabled = false;
     state.importing = false;
     setText(btn, 'Load');
+  }
+
+  function hideStatus() {
     statusEl.classList.remove('live', 'expanded');
     setTimeout(() => setDisplay(statusEl, 'none'), 350);
   }
+
+  let stageSwapTimer = null;
+  const setImportStage = (text) => {
+    clearTimeout(stageSwapTimer);
+    stageEl.classList.add('updating');
+    stageSwapTimer = setTimeout(() => {
+      setText(stageEl, text || '');
+      stageEl.classList.remove('updating');
+    }, 120);
+  };
+
+  let firstES = null;
 
   try {
     const res = await fetch(`${SERVER}/api/playlist/info?url=${encodeURIComponent(url)}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Failed to load playlist');
 
-    restoreAll();
+    if (!data.tracks || data.tracks.length === 0) {
+      throw new Error('Playlist is empty');
+    }
 
-    const { initPlaylist } = await import('./playlist.js');
-    initPlaylist(data, url);
-    urlInput.value = '';
+    const firstTrack = data.tracks[0];
+    const totalTracks = data.tracks.length;
+    const isSpotifySource = /spotify\.com/i.test(url);
+
+    // Update import card to show the first track + playlist context
+    resetBarStages();
+    advanceBarToStage('resolve');
+    completeBarStage('resolve');
+    setText(titleEl, firstTrack.name || 'Track 1');
+    setText(artistEl, firstTrack.artist || '');
+    if (firstTrack.image_url) {
+      artEl.innerHTML = `<img src="${firstTrack.image_url}" alt="album art">`;
+    }
+    // Show "Playlist name · Track 1 of N"
+    trackProgEl.textContent = `${data.name} · Track 1 of ${totalTracks}`;
+    trackProgEl.classList.add('visible');
+    statusEl.classList.add('expanded');
+
+    const trackData = {
+      index: 0,
+      name: firstTrack.name,
+      artist: firstTrack.artist || '',
+      album: firstTrack.album || '',
+      duration_ms: firstTrack.duration_ms || 0,
+      image_url: firstTrack.image_url || null,
+      video_id: firstTrack.video_id || null,
+    };
+
+    firstES = new EventSource(
+      `${SERVER}/api/download/track?track_data=${encodeURIComponent(JSON.stringify(trackData))}`
+    );
+
+    firstES.addEventListener('stage', e => {
+      const d = JSON.parse(e.data);
+      const msg = (d.stage in STAGE_MESSAGES) ? STAGE_MESSAGES[d.stage] : d.message;
+      if (msg !== null) setImportStage(msg);
+      if (d.stage === 'converting') {
+        const idx = BAR_STAGES.indexOf('process');
+        for (let i = Math.max(0, barStageIndex); i < idx; i++) completeBarStage(BAR_STAGES[i]);
+        barStageIndex = idx;
+        setBarStageActive('process');
+      } else {
+        const barStage = SSE_TO_BAR_STAGE[d.stage];
+        if (barStage) advanceBarToStage(barStage);
+      }
+    });
+
+    firstES.addEventListener('found', e => {
+      const d = JSON.parse(e.data);
+      setImportStage(d.fallback ? 'No exact match — searching YouTube…' : 'Found on YouTube Music');
+      advanceBarToStage('download');
+    });
+
+    firstES.addEventListener('progress', e => {
+      const d = JSON.parse(e.data);
+      const seg = SSE_TO_BAR_STAGE[d.stage] || 'download';
+      setBarStageProgress(seg, d.percent);
+    });
+
+    firstES.addEventListener('complete', async e => {
+      firstES.close();
+      firstES = null;
+      const d = JSON.parse(e.data);
+      completeBarStage('process');
+      setImportStage('Loading into studio…');
+      setTimeout(() => advanceBarToStage('load'), 200);
+
+      try {
+        // Fetch WITHOUT consume — playlist.js manages the file lifetime
+        const fileRes = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(d.file)}`);
+        if (!fileRes.ok) throw new Error('Could not retrieve file');
+        const contentLength = parseInt(fileRes.headers.get('Content-Length') || '0', 10);
+        const reader = fileRes.body.getReader();
+        const chunks = [];
+        let received = 0;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+          received += value.byteLength;
+          if (contentLength > 0) setBarStageProgress('load', Math.round((received / contentLength) * 100));
+        }
+        const ab = new Uint8Array(received);
+        let pos = 0;
+        for (const chunk of chunks) { ab.set(chunk, pos); pos += chunk.byteLength; }
+
+        const sourceLinks = {
+          spotify: isSpotifySource ? url : null,
+          youtube: isSpotifySource
+            ? (firstTrack.video_id ? `https://www.youtube.com/watch?v=${firstTrack.video_id}` : null)
+            : url,
+        };
+        await loadFile(ab.buffer, (firstTrack.name || 'track') + '.mp3', {
+          autoPlay: true,
+          sourceLinks,
+          suppressToast: true,
+        });
+        completeBarStage('load');
+        await new Promise(resolve => setTimeout(resolve, 220));
+        hideStatus();
+      } catch (err) {
+        setImportStage('✗ ' + err.message);
+        toast('Error loading track: ' + err.message, 5000, 'error');
+      }
+
+      restoreInputsOnly();
+      urlInput.value = '';
+
+      const { initPlaylist } = await import('./playlist.js');
+      initPlaylist(data, url, { firstTrackPath: d.file });
+    });
+
+    firstES.addEventListener('error', e => {
+      if (firstES) firstES.close();
+      firstES = null;
+      let msg = 'Download failed';
+      try { msg = JSON.parse(e.data).message; } catch {}
+      toast('Error: ' + msg, 5000, 'error');
+      restoreInputsOnly();
+      hideStatus();
+    });
+
+    firstES.onerror = () => {
+      if (!firstES || firstES.readyState === EventSource.CLOSED) return;
+      firstES.close();
+      firstES = null;
+      toast('Connection lost', 3000, 'error');
+      restoreInputsOnly();
+      hideStatus();
+    };
+
   } catch (err) {
+    if (firstES) { firstES.close(); firstES = null; }
     toast('Error: ' + err.message, 5000, 'error');
-    restoreAll();
+    restoreInputsOnly();
+    hideStatus();
   }
 }
 

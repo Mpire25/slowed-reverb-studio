@@ -73,6 +73,15 @@ $id('playBtn').addEventListener('click', () => {
 
 $id('startBtn').addEventListener('click', () => {
   if (!state.audioBuffer) return;
+  if (isPlaylistActive()) {
+    // In playlist mode: go to previous track (or start of track if near beginning)
+    if (currentPosition() > 3) {
+      seekTo(0); drawWaveform(); updateTimeDisplay();
+    } else {
+      jumpToTrack(getCurrentIndex() - 1);
+    }
+    return;
+  }
   seekTo(0);
   drawWaveform();
   updateTimeDisplay();
@@ -80,6 +89,10 @@ $id('startBtn').addEventListener('click', () => {
 
 $id('endBtn').addEventListener('click', () => {
   if (!state.audioBuffer) return;
+  if (isPlaylistActive()) {
+    jumpToTrack(getCurrentIndex() + 1);
+    return;
+  }
   state.pausedAt = state.duration;
   if (state.source) {
     state.playing = false;
@@ -300,11 +313,5 @@ document.addEventListener('keydown', e => {
     applyVolume();
     updateMuteBtn();
     updateVolumeTrack();
-  }
-  if (e.key === 'ArrowRight' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
-    if (isPlaylistActive()) { e.preventDefault(); jumpToTrack(getCurrentIndex() + 1); }
-  }
-  if (e.key === 'ArrowLeft' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey) {
-    if (isPlaylistActive()) { e.preventDefault(); jumpToTrack(getCurrentIndex() - 1); }
   }
 });

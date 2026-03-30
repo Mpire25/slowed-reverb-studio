@@ -2,7 +2,7 @@ import { SERVER } from './config.js';
 import { state } from './state.js';
 import { loadFile } from './loader.js';
 import { setOnTrackEnded } from './audio.js';
-import { fmt } from './utils.js';
+import { fmt, toast } from './utils.js';
 import { $id } from './dom.js';
 
 const AHEAD = 5;
@@ -26,7 +26,7 @@ const ps = {
 export function isPlaylistActive() { return ps.active; }
 export function getCurrentIndex() { return ps.currentIndex; }
 
-export function initPlaylist(data, sourceUrl) {
+export function initPlaylist(data, sourceUrl, { firstTrackPath = null } = {}) {
   // Close any existing playlist first (without triggering resetStudio)
   _teardown();
 
@@ -45,18 +45,32 @@ export function initPlaylist(data, sourceUrl) {
     retries: 0,
   }));
 
+  // If the first track was already downloaded by importer, mark it ready
+  if (firstTrackPath && ps.tracks.length > 0) {
+    ps.tracks[0].filePath = firstTrackPath;
+    ps.tracks[0].status = 'ready';
+  }
+
   // Register the close hook for resetStudio
   window.__playlistCloseHook = closePlaylist;
 
-  _openSidebar(data.name || 'Playlist', ps.tracks.length);
+  _openPanel(data.name || 'Playlist', ps.tracks.length);
   _renderTrackList();
-  _setCurrentTrack(0);
+
+  // Start from track 0 but skip downloading it if already ready
+  ps.currentIndex = 0;
+  const curRow = $id(`pl-row-0`);
+  if (curRow) { curRow.classList.add('is-playing'); curRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+  _updateRowStatus(0);
+  setOnTrackEnded(_onTrackEnded);
+  _downloadNext(); // downloads tracks 1-5 in background (track 0 already ready)
+  _syncMobileBar();
 }
 
 export function closePlaylist() {
   window.__playlistCloseHook = null;
   _teardown();
-  _closeSidebar();
+  _closePanelUI();
 }
 
 export function jumpToTrack(index) {
@@ -69,18 +83,21 @@ export function jumpToTrack(index) {
     _setCurrentTrack(index);
     _loadAndPlayTrack(index);
   } else if (track.status === 'evicted') {
-    // Re-queue it
     track.status = 'pending';
     track.retries = 0;
+    toast(`Loading "${track.name}"…`, 3000, 'info');
     _setCurrentTrack(index);
     _prioritizeAndDownload(index);
   } else {
     // pending / downloading / error
-    _setCurrentTrack(index);
     if (track.status === 'error') {
       track.status = 'pending';
       track.retries = 0;
     }
+    if (track.status !== 'downloading') {
+      toast(`Loading "${track.name}"…`, 3000, 'info');
+    }
+    _setCurrentTrack(index);
     _prioritizeAndDownload(index);
   }
 }
@@ -117,6 +134,7 @@ function _setCurrentTrack(index) {
 
   setOnTrackEnded(_onTrackEnded);
   _downloadNext();
+  _syncMobileBar();
 }
 
 function _onTrackEnded() {
@@ -302,63 +320,107 @@ function _teardown() {
   ps.sourceUrl = null;
 }
 
-// ── Internal: sidebar UI ───────────────────────────────────────────────────────
+// ── Internal: panel UI ─────────────────────────────────────────────────────────
 
-function _openSidebar(name, count) {
-  const sidebar = $id('playlistSidebar');
+function _openPanel(name, count) {
   const nameEl = $id('playlistSidebarName');
   const countEl = $id('playlistSidebarCount');
+  const mobileNameEl = $id('playlistMobileOverlayName');
+  const countStr = `${count} track${count !== 1 ? 's' : ''}`;
   if (nameEl) nameEl.textContent = name;
-  if (countEl) countEl.textContent = `${count} track${count !== 1 ? 's' : ''}`;
-  if (sidebar) sidebar.classList.add('open');
+  if (countEl) countEl.textContent = countStr;
+  if (mobileNameEl) mobileNameEl.textContent = name;
   document.body.classList.add('playlist-open');
 
-  const closeBtn = $id('playlistSidebarClose');
-  if (closeBtn) {
-    closeBtn.onclick = () => {
-      closePlaylist();
-      // Also call resetStudio to clear the player? No — user might want to keep current track.
-      // Just close the sidebar and deactivate playlist mode.
-    };
-  }
+  // Update transport button labels to reflect prev/next role
+  const startBtn = $id('startBtn');
+  const endBtn = $id('endBtn');
+  if (startBtn) { startBtn.title = 'Previous Track'; startBtn.setAttribute('aria-label', 'Previous Track'); }
+  if (endBtn)   { endBtn.title = 'Next Track';     endBtn.setAttribute('aria-label', 'Next Track'); }
+
+  // Mobile bar/overlay wiring
+  const mobileBtn = $id('playlistMobileBarBtn');
+  const mobileClose = $id('playlistMobileOverlayClose');
+  if (mobileBtn) mobileBtn.onclick = _openMobileOverlay;
+  if (mobileClose) mobileClose.onclick = _closeMobileOverlay;
 }
 
-function _closeSidebar() {
-  const sidebar = $id('playlistSidebar');
-  if (sidebar) sidebar.classList.remove('open');
+function _closePanelUI() {
   document.body.classList.remove('playlist-open');
   const list = $id('playlistTrackList');
   if (list) list.innerHTML = '';
+  const mobileList = $id('playlistMobileTrackList');
+  if (mobileList) mobileList.innerHTML = '';
+  _closeMobileOverlay();
+
+  // Restore transport button labels
+  const startBtn = $id('startBtn');
+  const endBtn = $id('endBtn');
+  if (startBtn) { startBtn.title = 'Start'; startBtn.setAttribute('aria-label', 'Start'); }
+  if (endBtn)   { endBtn.title = 'End';   endBtn.setAttribute('aria-label', 'End'); }
+}
+
+function _openMobileOverlay() {
+  const overlay = $id('playlistMobileOverlay');
+  if (!overlay) return;
+  overlay.classList.add('open');
+  // Sync the mobile list from the main list
+  const mainList = $id('playlistTrackList');
+  const mobileList = $id('playlistMobileTrackList');
+  if (mainList && mobileList) mobileList.innerHTML = mainList.innerHTML;
+  // Re-attach click handlers to mobile rows
+  mobileList.querySelectorAll('.pl-row').forEach(row => {
+    row.addEventListener('click', () => {
+      _closeMobileOverlay();
+      jumpToTrack(parseInt(row.dataset.index, 10));
+    });
+  });
+}
+
+function _closeMobileOverlay() {
+  const overlay = $id('playlistMobileOverlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function _syncMobileBar() {
+  const barTrack = $id('playlistMobileBarTrack');
+  const barCount = $id('playlistMobileBarCount');
+  if (!barTrack || !barCount) return;
+  const cur = ps.tracks[ps.currentIndex];
+  if (cur) {
+    barTrack.textContent = cur.name;
+    barCount.textContent = `${ps.currentIndex + 1} / ${ps.tracks.length}`;
+  }
+}
+
+function _makeTrackRow(track) {
+  const row = document.createElement('div');
+  row.className = 'pl-row';
+  row.id = `pl-row-${track.index}`;
+  row.dataset.index = track.index;
+  const dur = track.duration_ms > 0 ? fmt(track.duration_ms / 1000) : '–';
+  row.innerHTML = `
+    <span class="pl-row-num">${track.index + 1}</span>
+    <div class="pl-row-art">
+      ${track.image_url ? `<img src="${_esc(track.image_url)}" loading="lazy" alt="">` : '<span class="pl-row-art-placeholder">♪</span>'}
+    </div>
+    <div class="pl-row-info">
+      <div class="pl-row-title">${_esc(track.name)}</div>
+      <div class="pl-row-artist">${_esc(track.artist)}</div>
+    </div>
+    <span class="pl-row-dur">${dur}</span>
+    <span class="pl-row-status" id="pl-status-${track.index}"></span>
+  `;
+  row.addEventListener('click', () => jumpToTrack(track.index));
+  return row;
 }
 
 function _renderTrackList() {
   const list = $id('playlistTrackList');
   if (!list) return;
   list.innerHTML = '';
-
   for (const track of ps.tracks) {
-    const row = document.createElement('div');
-    row.className = 'pl-row';
-    row.id = `pl-row-${track.index}`;
-    row.dataset.index = track.index;
-
-    const dur = track.duration_ms > 0 ? fmt(track.duration_ms / 1000) : '–';
-
-    row.innerHTML = `
-      <span class="pl-row-num">${track.index + 1}</span>
-      <div class="pl-row-art">
-        ${track.image_url ? `<img src="${_esc(track.image_url)}" loading="lazy" alt="">` : '<span class="pl-row-art-placeholder">♪</span>'}
-      </div>
-      <div class="pl-row-info">
-        <div class="pl-row-title">${_esc(track.name)}</div>
-        <div class="pl-row-artist">${_esc(track.artist)}</div>
-      </div>
-      <span class="pl-row-dur">${dur}</span>
-      <span class="pl-row-status" id="pl-status-${track.index}"></span>
-    `;
-
-    row.addEventListener('click', () => jumpToTrack(track.index));
-    list.appendChild(row);
+    list.appendChild(_makeTrackRow(track));
   }
 }
 
