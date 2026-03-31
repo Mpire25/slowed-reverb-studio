@@ -8,8 +8,8 @@ import {
 } from './state.js';
 import { loadFile } from './loader.js';
 import { setOnTrackEnded, getCtx } from './audio.js';
-import { fmt, toast } from './utils.js';
-import { $id } from './dom.js';
+import { toast } from './utils.js';
+import { createPlaylistView } from './playlist_view.js';
 
 const BEHIND = 2;
 const MAX_RETRIES = 2;
@@ -26,7 +26,10 @@ const ps = {
   downloadingIndex: -1,
   pendingPlayIndex: -1,  // track index waiting on a download before playing
 };
-let panelHeightObserver = null;
+const view = createPlaylistView({
+  onJumpToTrack: index => jumpToTrack(index),
+  onToggleLoop: () => _togglePlaylistLoop(),
+});
 
 // ── Public API ─────────────────────────────────────────────────────────────────
 
@@ -69,8 +72,7 @@ export function initPlaylist(data, sourceUrl, { firstTrackPath = null } = {}) {
 
   // Start from track 0 but skip downloading it if already ready
   ps.currentIndex = 0;
-  const curRow = $id(`pl-row-0`);
-  if (curRow) { curRow.classList.add('is-playing'); curRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+  view.setCurrentRow(-1, 0);
   _updateRowStatus(0);
   setOnTrackEnded(_onTrackEnded);
   _downloadNext(); // downloads upcoming tracks in background (track 0 already ready)
@@ -135,16 +137,7 @@ function _setCurrentTrack(index) {
 
   _evictOutsideWindow(index);
 
-  // Update sidebar highlighting
-  if (prev >= 0) {
-    const prevRow = $id(`pl-row-${prev}`);
-    if (prevRow) prevRow.classList.remove('is-playing');
-  }
-  const curRow = $id(`pl-row-${index}`);
-  if (curRow) {
-    curRow.classList.add('is-playing');
-    curRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
+  view.setCurrentRow(prev, index);
 
   setOnTrackEnded(_onTrackEnded);
   _downloadNext();
@@ -415,96 +408,18 @@ function _teardown() {
 
 // ── Internal: panel UI ─────────────────────────────────────────────────────────
 
-function _syncPanelHeightToApp() {
-  const app = document.querySelector('.app');
-  const panel = $id('playlistPanel');
-  if (!app || !panel) return;
-
-  const appStyles = window.getComputedStyle(app);
-  const paddingTop = parseFloat(appStyles.paddingTop) || 0;
-  const paddingBottom = parseFloat(appStyles.paddingBottom) || 0;
-  const appHeight = app.getBoundingClientRect().height;
-  const contentHeight = Math.max(0, Math.round(appHeight - paddingTop - paddingBottom));
-
-  panel.style.height = contentHeight > 0 ? `${contentHeight}px` : '';
-}
-
-function _startPanelHeightSync() {
-  _stopPanelHeightSync();
-  _syncPanelHeightToApp();
-  window.addEventListener('resize', _syncPanelHeightToApp);
-
-  if (typeof ResizeObserver !== 'undefined') {
-    const app = document.querySelector('.app');
-    if (app) {
-      panelHeightObserver = new ResizeObserver(_syncPanelHeightToApp);
-      panelHeightObserver.observe(app);
-    }
-  }
-}
-
-function _stopPanelHeightSync() {
-  window.removeEventListener('resize', _syncPanelHeightToApp);
-  if (panelHeightObserver) {
-    panelHeightObserver.disconnect();
-    panelHeightObserver = null;
-  }
-
-  const panel = $id('playlistPanel');
-  if (panel) panel.style.height = '';
-}
-
 function _openPanel(name, count) {
-  const nameEl = $id('playlistSidebarName');
-  const countEl = $id('playlistSidebarCount');
-  const mobileNameEl = $id('playlistMobileOverlayName');
-  const loopBtn = $id('playlistLoopBtn');
-  const countStr = `${count} track${count !== 1 ? 's' : ''}`;
-  if (nameEl) nameEl.textContent = name;
-  if (countEl) countEl.textContent = countStr;
-  if (mobileNameEl) mobileNameEl.textContent = name;
-  if (loopBtn) loopBtn.onclick = _togglePlaylistLoop;
-  document.body.classList.add('playlist-open');
-
-  // Update transport button labels to reflect prev/next role
-  const startBtn = $id('startBtn');
-  const endBtn = $id('endBtn');
-  if (startBtn) { startBtn.title = 'Previous Track'; startBtn.setAttribute('aria-label', 'Previous Track'); }
-  if (endBtn)   { endBtn.title = 'Next Track';     endBtn.setAttribute('aria-label', 'Next Track'); }
-
-  // Mobile bar/overlay wiring
-  const mobileBtn = $id('playlistMobileBarBtn');
-  const mobileClose = $id('playlistMobileOverlayClose');
-  if (mobileBtn) mobileBtn.onclick = _openMobileOverlay;
-  if (mobileClose) mobileClose.onclick = _closeMobileOverlay;
-
-  _syncPlaylistLoopButton();
-  _startPanelHeightSync();
+  view.openPanel(name, count, ps.loopEnabled);
 }
 
 function _closePanelUI() {
-  _stopPanelHeightSync();
-  document.body.classList.remove('playlist-open');
-  const loopBtn = $id('playlistLoopBtn');
-  if (loopBtn) loopBtn.onclick = null;
-  const list = $id('playlistTrackList');
-  if (list) list.innerHTML = '';
-  const mobileList = $id('playlistMobileTrackList');
-  if (mobileList) mobileList.innerHTML = '';
-  _closeMobileOverlay();
-
-  // Restore transport button labels
-  const startBtn = $id('startBtn');
-  const endBtn = $id('endBtn');
-  if (startBtn) { startBtn.title = 'Start'; startBtn.setAttribute('aria-label', 'Start'); }
-  if (endBtn)   { endBtn.title = 'End';   endBtn.setAttribute('aria-label', 'End'); }
-  _syncPlaylistLoopButton();
+  view.closePanel();
 }
 
 function _togglePlaylistLoop() {
   if (!ps.active) return;
   ps.loopEnabled = !ps.loopEnabled;
-  _syncPlaylistLoopButton();
+  view.setLoopEnabled(ps.loopEnabled);
   _downloadNext();
 }
 
@@ -544,126 +459,16 @@ function _isInRetentionWindow(trackIndex, currentIndex) {
   return aheadDistance <= aheadCount || behindDistance <= BEHIND;
 }
 
-function _syncPlaylistLoopButton() {
-  const btn = $id('playlistLoopBtn');
-  if (!btn) return;
-  btn.classList.toggle('active', ps.loopEnabled);
-  btn.setAttribute('aria-pressed', ps.loopEnabled ? 'true' : 'false');
-  btn.title = ps.loopEnabled ? 'Loop Playlist On' : 'Loop Playlist Off';
-}
-
-function _openMobileOverlay() {
-  const overlay = $id('playlistMobileOverlay');
-  if (!overlay) return;
-  overlay.classList.add('open');
-  // Sync the mobile list from the main list without duplicating IDs.
-  // Duplicate IDs can break global lookups used by status updates.
-  const mainList = $id('playlistTrackList');
-  const mobileList = $id('playlistMobileTrackList');
-  if (mainList && mobileList) {
-    mobileList.innerHTML = '';
-    for (const row of mainList.querySelectorAll('.pl-row')) {
-      const clone = row.cloneNode(true);
-      clone.removeAttribute('id');
-      clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
-      mobileList.appendChild(clone);
-    }
-  }
-  if (!mobileList) return;
-  // Re-attach click handlers to mobile rows
-  mobileList.querySelectorAll('.pl-row').forEach(row => {
-    row.addEventListener('click', () => {
-      _closeMobileOverlay();
-      jumpToTrack(parseInt(row.dataset.index, 10));
-    });
-  });
-}
-
-function _closeMobileOverlay() {
-  const overlay = $id('playlistMobileOverlay');
-  if (overlay) overlay.classList.remove('open');
-}
-
 function _syncMobileBar() {
-  const barTrack = $id('playlistMobileBarTrack');
-  const barCount = $id('playlistMobileBarCount');
-  if (!barTrack || !barCount) return;
-  const cur = ps.tracks[ps.currentIndex];
-  if (cur) {
-    barTrack.textContent = cur.name;
-    barCount.textContent = `${ps.currentIndex + 1} / ${ps.tracks.length}`;
-  }
-}
-
-function _makeTrackRow(track) {
-  const row = document.createElement('div');
-  row.className = 'pl-row';
-  row.id = `pl-row-${track.index}`;
-  row.dataset.index = track.index;
-  const dur = track.duration_ms > 0 ? fmt(track.duration_ms / 1000) : '–';
-  row.innerHTML = `
-    <span class="pl-row-num">${track.index + 1}</span>
-    <div class="pl-row-art">
-      ${track.image_url ? `<img src="${_esc(track.image_url)}" loading="lazy" alt="">` : '<span class="pl-row-art-placeholder">♪</span>'}
-    </div>
-    <div class="pl-row-info">
-      <div class="pl-row-title">${_esc(track.name)}</div>
-      <div class="pl-row-artist">${_esc(track.artist)}</div>
-    </div>
-    <span class="pl-row-dur">${dur}</span>
-    <span class="pl-row-status" id="pl-status-${track.index}"></span>
-  `;
-  row.addEventListener('click', () => jumpToTrack(track.index));
-  return row;
+  view.syncMobileBar(ps.tracks, ps.currentIndex);
 }
 
 function _renderTrackList() {
-  const list = $id('playlistTrackList');
-  if (!list) return;
-  list.innerHTML = '';
-  for (const track of ps.tracks) {
-    list.appendChild(_makeTrackRow(track));
-  }
+  view.renderTrackList(ps.tracks);
 }
 
 function _updateRowStatus(index) {
-  const statusEl = $id(`pl-status-${index}`);
-  if (!statusEl) return;
   const track = ps.tracks[index];
   if (!track) return;
-
-  switch (track.status) {
-    case 'downloading':
-      statusEl.innerHTML = '<span class="pl-spinner"></span>';
-      break;
-    case 'ready':
-      statusEl.innerHTML = '<span class="pl-status-ready">✓</span>';
-      break;
-    case 'error':
-      statusEl.innerHTML = '<span class="pl-status-error">✕</span>';
-      break;
-    case 'evicted':
-      statusEl.innerHTML = '<span class="pl-status-evicted">↺</span>';
-      break;
-    default:
-      statusEl.innerHTML = '';
-  }
-
-  // Update playing indicator
-  const row = $id(`pl-row-${index}`);
-  if (row) {
-    if (index === ps.currentIndex) {
-      row.classList.add('is-playing');
-    } else {
-      row.classList.remove('is-playing');
-    }
-  }
-}
-
-function _esc(str) {
-  return String(str || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  view.updateRowStatus(index, track, ps.currentIndex);
 }
