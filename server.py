@@ -28,6 +28,16 @@ STUDIO_DIR = Path(__file__).parent
 DOWNLOADS_DIR = STUDIO_DIR / "downloads"
 STATIC_DIR = STUDIO_DIR / "static"
 
+# Load .env from project root so OAuth/status routes can read Spotify keys
+# before any lazy imports run.
+_env_file = STUDIO_DIR / ".env"
+if _env_file.exists():
+    for _line in _env_file.read_text().splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _v = _line.split("=", 1)
+            os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
+
 
 CLEANUP_INTERVAL = 30 * 60  # seconds between periodic sweeps
 CLEANUP_MAX_AGE  = 60 * 60  # files older than this are deleted
