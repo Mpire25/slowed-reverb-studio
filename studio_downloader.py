@@ -9,6 +9,7 @@ import os
 import re
 import json
 import base64
+import html as html_lib
 import subprocess
 import urllib.request
 import urllib.parse
@@ -66,13 +67,258 @@ def _spotify_token():
         return json.loads(resp.read())["access_token"]
 
 
-def _spotify_get(path, token):
+def has_spotify_oauth():
+    """Returns True if a Spotify refresh token is stored."""
+    return bool(os.environ.get("SPOTIFY_REFRESH_TOKEN", ""))
+
+
+def _spotify_user_token():
+    """Get a user-scoped access token using the stored refresh token."""
+    import urllib.error
+    refresh_token = os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
+    if not refresh_token:
+        raise RuntimeError("spotify_auth_required")
+    client_id = os.environ.get("SPOTIFY_CLIENT_ID", "")
+    client_secret = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
+    creds = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+    data = urllib.parse.urlencode({
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+    }).encode()
     req = urllib.request.Request(
-        f"https://api.spotify.com/v1{path}",
-        headers={"Authorization": f"Bearer {token}"},
+        "https://accounts.spotify.com/api/token",
+        data=data,
+        headers={"Authorization": f"Basic {creds}"},
     )
-    with urllib.request.urlopen(req) as resp:
-        return json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return json.loads(resp.read())["access_token"]
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Failed to refresh Spotify token: {body}") from None
+
+
+def _spotify_get(path, token):
+    import urllib.error
+    if path.startswith("http://") or path.startswith("https://"):
+        url = path
+    else:
+        url = f"https://api.spotify.com/v1{path}"
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Spotify API {e.code}: {body}") from None
+
+
+_SPOTIFY_SONG_META_RE = re.compile(
+    r'<meta[^>]+name=["\']music:song["\'][^>]+content=["\']https://open\.spotify\.com/track/([A-Za-z0-9]+)["\']',
+    re.IGNORECASE,
+)
+
+
+def _spotify_track_payload_to_dict(track_payload):
+    """Normalise Spotify track payloads into the downloader's track shape."""
+    if not isinstance(track_payload, dict):
+        return None
+    if track_payload.get("type") not in (None, "track"):
+        return None
+    if not track_payload.get("name"):
+        return None
+    album_obj = track_payload.get("album")
+    if not isinstance(album_obj, dict):
+        album_obj = {}
+    images = album_obj.get("images")
+    if not isinstance(images, list):
+        images = []
+    artists = track_payload.get("artists")
+    if not isinstance(artists, list):
+        artists = []
+    first_artist = artists[0] if artists and isinstance(artists[0], dict) else {}
+    artist_name = first_artist.get("name") or "Unknown"
+    ext = track_payload.get("external_urls")
+    if not isinstance(ext, dict):
+        ext = {}
+    spotify_url = ext.get("spotify")
+    if not spotify_url:
+        track_id = track_payload.get("id")
+        if track_id:
+            spotify_url = f"https://open.spotify.com/track/{track_id}"
+    return {
+        "name": track_payload["name"],
+        "artist": artist_name,
+        "album": album_obj.get("name", ""),
+        "duration_ms": track_payload.get("duration_ms", 0),
+        "image_url": images[0]["url"] if images else None,
+        "spotify_url": spotify_url,
+    }
+
+
+def _spotify_extract_playlist_tracks(payload):
+    """
+    Extract track entries from Spotify playlist payloads.
+    Supports:
+    - /playlists/{id} style payloads with `tracks.items`
+    - paged payloads with top-level `items` list
+    - nested `items.items` variants
+    """
+    containers = []
+    if isinstance(payload.get("tracks"), dict):
+        containers.append(payload["tracks"].get("items") or [])
+    if isinstance(payload.get("items"), list):
+        containers.append(payload.get("items") or [])
+    elif isinstance(payload.get("items"), dict):
+        containers.append(payload["items"].get("items") or [])
+    tracks = []
+    for entries in containers:
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            track_payload = entry.get("track")
+            if not isinstance(track_payload, dict):
+                track_payload = entry.get("item")
+            if not isinstance(track_payload, dict) and entry.get("name"):
+                track_payload = entry
+            track = _spotify_track_payload_to_dict(track_payload)
+            if track:
+                tracks.append(track)
+    return tracks
+
+
+def _spotify_playlist_next_url(payload):
+    # Common Spotify paging shape: top-level `next`.
+    next_url = payload.get("next")
+    if next_url:
+        return next_url
+
+    # Also support nested paging containers.
+    for key in ("items", "tracks"):
+        container = payload.get(key)
+        if isinstance(container, dict):
+            next_url = container.get("next")
+            if next_url:
+                return next_url
+    return None
+
+
+def _spotify_get_tracks_by_ids(track_ids, token):
+    tracks = []
+    cache = {}
+    for track_id in track_ids:
+        if track_id in cache:
+            raw = cache[track_id]
+        else:
+            try:
+                raw = _spotify_get(f"/tracks/{track_id}", token)
+            except RuntimeError:
+                raw = None
+            cache[track_id] = raw
+        track = _spotify_track_payload_to_dict(raw)
+        if track:
+            tracks.append(track)
+    return tracks
+
+
+def _html_meta_content(html_text, attr_name, attr_value):
+    attr_value = re.escape(attr_value)
+    p1 = re.compile(
+        rf'<meta[^>]+{attr_name}=["\']{attr_value}["\'][^>]+content=["\']([^"\']+)["\']',
+        re.IGNORECASE,
+    )
+    m = p1.search(html_text)
+    if not m:
+        p2 = re.compile(
+            rf'<meta[^>]+content=["\']([^"\']+)["\'][^>]+{attr_name}=["\']{attr_value}["\']',
+            re.IGNORECASE,
+        )
+        m = p2.search(html_text)
+    return html_lib.unescape(m.group(1)).strip() if m else None
+
+
+def _spotify_playlist_from_public_page(sid, token):
+    """
+    Fallback for public playlists where Spotify's playlist-items API is blocked.
+    Uses open.spotify.com metadata to gather track IDs.
+    """
+    page_url = f"https://open.spotify.com/playlist/{sid}"
+    req = urllib.request.Request(
+        page_url,
+        headers={"User-Agent": "Mozilla/5.0"},
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            html_text = resp.read().decode("utf-8", errors="replace")
+    except Exception as e:
+        raise RuntimeError(f"Could not fetch public Spotify playlist page: {e}") from None
+
+    track_ids = _SPOTIFY_SONG_META_RE.findall(html_text)
+    if not track_ids:
+        raise RuntimeError("Spotify playlist is private or unavailable to your account")
+
+    # Public track lookups are often available with app credentials even when playlist-items aren't.
+    track_token = token
+    try:
+        tracks = _spotify_get_tracks_by_ids(track_ids, track_token)
+    except Exception:
+        track_token = _spotify_token()
+        tracks = _spotify_get_tracks_by_ids(track_ids, track_token)
+
+    if not tracks:
+        raise RuntimeError("Spotify playlist has no playable tracks")
+
+    playlist_name = _html_meta_content(html_text, "property", "og:title") or "Spotify Playlist"
+    playlist_image = _html_meta_content(html_text, "property", "og:image") or tracks[0].get("image_url")
+    return tracks, {"name": playlist_name, "type": "playlist", "image_url": playlist_image}
+
+
+def _spotify_get_playlist_tracks(sid, token):
+    """
+    Get Spotify playlist tracks, supporting both legacy (`tracks`) and newer (`items`) payload shapes.
+    Falls back to scraping open.spotify.com metadata for public playlists.
+    """
+    playlist_name = "Spotify Playlist"
+    playlist_image = None
+    tracks = []
+    api_error = None
+
+    try:
+        meta = _spotify_get(f"/playlists/{sid}", token)
+        playlist_name = meta.get("name") or playlist_name
+        images = meta.get("images")
+        if isinstance(images, list) and images:
+            playlist_image = images[0].get("url")
+
+        tracks.extend(_spotify_extract_playlist_tracks(meta))
+        next_url = _spotify_playlist_next_url(meta)
+        while next_url:
+            page = _spotify_get(next_url, token)
+            tracks.extend(_spotify_extract_playlist_tracks(page))
+            next_url = _spotify_playlist_next_url(page)
+    except RuntimeError as e:
+        api_error = e
+
+    if not tracks:
+        try:
+            fallback_tracks, fallback_meta = _spotify_playlist_from_public_page(sid, token)
+            if fallback_meta.get("name"):
+                playlist_name = fallback_meta["name"]
+            if fallback_meta.get("image_url"):
+                playlist_image = fallback_meta["image_url"]
+            tracks = fallback_tracks
+        except RuntimeError:
+            if api_error:
+                raise api_error
+            raise
+
+    if not tracks:
+        raise RuntimeError("Spotify playlist is empty")
+    if not playlist_image:
+        playlist_image = tracks[0].get("image_url")
+    return tracks, {"name": playlist_name, "type": "playlist", "image_url": playlist_image}
 
 
 def _get_spotify_tracks(url, token):
@@ -87,12 +333,14 @@ def _get_spotify_tracks(url, token):
         artist = data["artists"][0]["name"]
         album = data.get("album", {}).get("name", "")
         images = data.get("album", {}).get("images", [])
+        ext = data.get("external_urls", {})
         track = {
             "name": data["name"],
             "artist": artist,
             "album": album,
             "duration_ms": data["duration_ms"],
             "image_url": images[0]["url"] if images else None,
+            "spotify_url": ext.get("spotify") or f"https://open.spotify.com/track/{sid}",
         }
         return [track], {"name": data["name"], "artist": artist, "type": "track",
                          "image_url": track["image_url"]}
@@ -110,38 +358,22 @@ def _get_spotify_tracks(url, token):
                 "album": album_name,
                 "duration_ms": t["duration_ms"],
                 "image_url": image_url,
+                "spotify_url": (
+                    (t.get("external_urls") or {}).get("spotify")
+                    or (
+                        f"https://open.spotify.com/track/{t.get('id')}"
+                        if t.get("id")
+                        else None
+                    )
+                ),
             }
             for t in data["tracks"]["items"]
         ]
         return tracks, {"name": album_name, "artist": artist, "type": "album",
                         "image_url": image_url}
 
-    else:  # playlist
-        data = _spotify_get(f"/playlists/{sid}?fields=name,tracks.total", token)
-        total = data["tracks"]["total"]
-        tracks = []
-        offset = 0
-        while offset < total:
-            page = _spotify_get(
-                f"/playlists/{sid}/tracks"
-                f"?fields=items(track(name,duration_ms,artists,album(name,images)))&limit=50&offset={offset}",
-                token,
-            )
-            for item in page["items"]:
-                t = item.get("track")
-                if t and t.get("name"):
-                    images = t.get("album", {}).get("images", [])
-                    tracks.append({
-                        "name": t["name"],
-                        "artist": t["artists"][0]["name"] if t.get("artists") else "Unknown",
-                        "album": t.get("album", {}).get("name", ""),
-                        "duration_ms": t.get("duration_ms", 0),
-                        "image_url": images[0]["url"] if images else None,
-                    })
-            offset += 50
-        first_image = tracks[0]["image_url"] if tracks else None
-        return tracks, {"name": data["name"], "type": "playlist",
-                        "image_url": first_image}
+    else:  # playlist — requires user OAuth token for private lists
+        return _spotify_get_playlist_tracks(sid, token)
 
 
 # ── YouTube Music search ───────────────────────────────────────────────────────
@@ -252,6 +484,168 @@ def _find_youtube_id(track):
             pass
 
     return best_id
+
+
+def _candidate_album_score(result, expected_album, expected_artist):
+    """Quick score for album search candidates before expensive album fetch calls."""
+    album_title = result.get("title", "")
+    core_expected_album = _core_title(expected_album)
+    core_album_title = _core_title(album_title)
+
+    title_score = 0
+    if core_album_title == core_expected_album:
+        title_score = 60
+    elif core_expected_album and core_expected_album in core_album_title:
+        title_score = 30
+
+    artists = result.get("artists") or []
+    artist_blob = " ".join(a.get("name", "") for a in artists)
+    artist_score = 30 if _core_title(expected_artist) in _core_title(artist_blob) else 0
+    return title_score + artist_score
+
+
+def _match_album_tracks(spotify_tracks, ytm_tracks):
+    """
+    Attempt to match Spotify tracks to a YTM album tracklist.
+    Returns (is_confident, mapping_by_spotify_index).
+    """
+    if len(spotify_tracks) != len(ytm_tracks):
+        return False, {}
+
+    ordered_mapping = {}
+    ordered_title_matches = 0
+    duration_matches = 0
+
+    for i, (sp_track, yt_track) in enumerate(zip(spotify_tracks, ytm_tracks)):
+        sp_title = _core_title(sp_track.get("name", ""))
+        yt_title = _core_title(yt_track.get("title", ""))
+        if sp_title and sp_title == yt_title:
+            ordered_title_matches += 1
+
+        sp_duration = (sp_track.get("duration_ms") or 0) // 1000
+        yt_duration = yt_track.get("duration_seconds") or 0
+        if sp_duration > 0 and yt_duration > 0 and abs(sp_duration - yt_duration) <= 15:
+            duration_matches += 1
+
+        video_id = yt_track.get("videoId")
+        if not video_id:
+            return False, {}
+        ordered_mapping[i] = video_id
+
+    min_title_matches = max(1, int(len(spotify_tracks) * 0.8))
+    min_duration_matches = max(1, int(len(spotify_tracks) * 0.6))
+    if ordered_title_matches >= min_title_matches and duration_matches >= min_duration_matches:
+        return True, ordered_mapping
+
+    # Fallback: title-based matching for occasional ordering differences.
+    title_to_indices = {}
+    for idx, yt_track in enumerate(ytm_tracks):
+        title_to_indices.setdefault(_core_title(yt_track.get("title", "")), []).append(idx)
+
+    used_yt_indices = set()
+    mapping = {}
+    title_matches = 0
+    duration_matches = 0
+
+    for sp_idx, sp_track in enumerate(spotify_tracks):
+        key = _core_title(sp_track.get("name", ""))
+        candidate_indices = title_to_indices.get(key, [])
+        chosen = None
+        for yt_idx in candidate_indices:
+            if yt_idx not in used_yt_indices:
+                chosen = yt_idx
+                break
+        if chosen is None:
+            return False, {}
+
+        yt_track = ytm_tracks[chosen]
+        video_id = yt_track.get("videoId")
+        if not video_id:
+            return False, {}
+
+        used_yt_indices.add(chosen)
+        mapping[sp_idx] = video_id
+        title_matches += 1
+
+        sp_duration = (sp_track.get("duration_ms") or 0) // 1000
+        yt_duration = yt_track.get("duration_seconds") or 0
+        if sp_duration > 0 and yt_duration > 0 and abs(sp_duration - yt_duration) <= 15:
+            duration_matches += 1
+
+    min_title_matches = max(1, int(len(spotify_tracks) * 0.9))
+    min_duration_matches = max(1, int(len(spotify_tracks) * 0.7))
+    if title_matches >= min_title_matches and duration_matches >= min_duration_matches:
+        return True, mapping
+
+    return False, {}
+
+
+def _resolve_album_video_ids(spotify_tracks, album_meta):
+    """
+    Find a high-confidence YTM album match.
+    Returns (track-index -> videoId mapping, album_container_url_or_none).
+    """
+    if not spotify_tracks:
+        return {}, None
+
+    album_name = album_meta.get("name", "")
+    artist_name = album_meta.get("artist", "") or spotify_tracks[0].get("artist", "")
+    query = f"{artist_name} - {album_name}".strip(" -")
+
+    try:
+        ytm = _get_ytmusic()
+        candidates = ytm.search(query, filter="albums", limit=8)
+    except Exception:
+        return {}, None
+
+    ranked = sorted(
+        (c for c in candidates if isinstance(c, dict) and c.get("browseId")),
+        key=lambda c: _candidate_album_score(c, album_name, artist_name),
+        reverse=True,
+    )[:5]
+
+    if not ranked:
+        return {}, None
+
+    for candidate in ranked:
+        browse_id = candidate.get("browseId")
+        if not browse_id:
+            continue
+        try:
+            album_data = ytm.get_album(browse_id)
+        except Exception:
+            continue
+
+        ytm_tracks = album_data.get("tracks") or []
+        if not isinstance(ytm_tracks, list):
+            continue
+
+        confident, mapping = _match_album_tracks(spotify_tracks, ytm_tracks)
+        if confident and len(mapping) == len(spotify_tracks):
+            playlist_id = album_data.get("audioPlaylistId")
+            if playlist_id:
+                container_url = f"https://music.youtube.com/playlist?list={playlist_id}"
+            else:
+                container_url = f"https://music.youtube.com/browse/{browse_id}"
+            return mapping, container_url
+
+    return {}, None
+
+
+def _apply_album_match_video_ids(spotify_tracks, album_meta):
+    """
+    Mutates spotify_tracks to add `video_id` when a confident album match is found.
+    Sets album_meta["youtube_url"] to the matched YTM album container URL when available.
+    Returns number of assigned video IDs.
+    """
+    mapping, container_url = _resolve_album_video_ids(spotify_tracks, album_meta)
+    if len(mapping) != len(spotify_tracks):
+        return 0
+    for idx, video_id in mapping.items():
+        spotify_tracks[idx]["video_id"] = video_id
+    if container_url:
+        album_meta["youtube_url"] = container_url
+    return len(mapping)
 
 
 # ── Art & tag embedding ────────────────────────────────────────────────────────
@@ -480,7 +874,8 @@ def download_spotify(url, on_event):
     on_event("stage", {"stage": "fetching_metadata",
                         "message": "Fetching Spotify metadata…"})
 
-    token = _spotify_token()
+    is_playlist = bool(re.search(r'spotify\.com/playlist/', url))
+    token = _spotify_user_token() if is_playlist else _spotify_token()
     tracks, meta = _get_spotify_tracks(url, token)
 
     on_event("metadata", {
@@ -491,6 +886,17 @@ def download_spotify(url, on_event):
             for t in tracks
         ],
     })
+
+    if meta.get("type") == "album":
+        on_event("stage", {"stage": "searching",
+                            "message": "Trying album-level match on YouTube Music…"})
+        matched = _apply_album_match_video_ids(tracks, meta)
+        if matched == len(tracks):
+            on_event("stage", {"stage": "searching",
+                                "message": "Found confident album match; using album track IDs."})
+        else:
+            on_event("stage", {"stage": "searching",
+                                "message": "No confident album match; falling back to per-track search."})
 
     results = []
     for i, track in enumerate(tracks):

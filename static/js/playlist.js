@@ -20,7 +20,8 @@ const ps = {
   active: false,
   loopEnabled: false,
   sourceUrl: null,
-  tracks: [],         // {index, name, artist, album, duration_ms, image_url, video_id?, filePath, status, retries}
+  containerYouTubeUrl: null,
+  tracks: [],         // {index, name, artist, album, duration_ms, image_url, video_id?, spotify_url?, youtube_url?, filePath, status, retries}
   currentIndex: -1,
   activeES: null,     // currently open EventSource
   downloadingIndex: -1,
@@ -43,6 +44,7 @@ export function initPlaylist(data, sourceUrl, { firstTrackPath = null } = {}) {
   ps.active = true;
   ps.loopEnabled = true;
   ps.sourceUrl = sourceUrl;
+  ps.containerYouTubeUrl = data.youtube_url || null;
   ps.tracks = (data.tracks || []).map((t, i) => ({
     index: i,
     name: t.name || 'Unknown',
@@ -51,6 +53,8 @@ export function initPlaylist(data, sourceUrl, { firstTrackPath = null } = {}) {
     duration_ms: t.duration_ms || 0,
     image_url: t.image_url || null,
     video_id: t.video_id || null,
+    spotify_url: t.spotify_url || null,
+    youtube_url: t.youtube_url || null,
     filePath: null,
     status: 'pending',
     retries: 0,
@@ -180,8 +184,8 @@ async function _loadAndPlayTrack(index) {
     track.cachedDecodedBuffer = null;
 
     const sourceLinks = {
-      spotify: /spotify/i.test(ps.sourceUrl) ? ps.sourceUrl : null,
-      youtube: track.video_id ? `https://www.youtube.com/watch?v=${track.video_id}` : null,
+      spotify: track.spotify_url || (/spotify/i.test(ps.sourceUrl) ? ps.sourceUrl : null),
+      youtube: track.youtube_url || (track.video_id ? `https://www.youtube.com/watch?v=${track.video_id}` : null),
     };
 
     await loadFile(ab, track.name + '.mp3', {
@@ -307,6 +311,8 @@ function _startTrackDownload(idx) {
     duration_ms: track.duration_ms,
     image_url: track.image_url,
     video_id: track.video_id || null,
+    spotify_url: track.spotify_url || null,
+    youtube_url: track.youtube_url || null,
   };
 
   const es = new EventSource(
@@ -334,6 +340,19 @@ function _startTrackDownload(idx) {
     }
 
     _downloadNext();
+  });
+
+  es.addEventListener('found', e => {
+    let d = null;
+    try { d = JSON.parse(e.data); } catch {}
+    if (!d) return;
+    if (d.youtube_url) {
+      track.youtube_url = d.youtube_url;
+      if (!track.video_id) {
+        const m = /[?&]v=([^&]+)/.exec(d.youtube_url);
+        if (m && m[1]) track.video_id = m[1];
+      }
+    }
   });
 
   es.addEventListener('error', e => {
@@ -404,12 +423,20 @@ function _teardown() {
   ps.downloadingIndex = -1;
   ps.pendingPlayIndex = -1;
   ps.sourceUrl = null;
+  ps.containerYouTubeUrl = null;
 }
 
 // ── Internal: panel UI ─────────────────────────────────────────────────────────
 
 function _openPanel(name, count) {
-  view.openPanel(name, count, ps.loopEnabled);
+  const source = ps.sourceUrl || '';
+  const isSpotifySource = /spotify/i.test(source);
+  const isYouTubeSource = /music\.youtube\.com/i.test(source);
+  const sourceLinks = {
+    spotify: isSpotifySource ? source : null,
+    youtube: isYouTubeSource ? source : ps.containerYouTubeUrl,
+  };
+  view.openPanel(name, count, ps.loopEnabled, sourceLinks);
 }
 
 function _closePanelUI() {

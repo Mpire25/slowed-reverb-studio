@@ -169,15 +169,41 @@ export function createPlaylistView({ onJumpToTrack, onToggleLoop }) {
     }
   }
 
-  function openPanel(name, count, loopEnabled) {
+  function openPanel(name, count, loopEnabled, sourceLinks = null) {
     const nameEl = $id('playlistSidebarName');
     const countEl = $id('playlistSidebarCount');
     const mobileNameEl = $id('playlistMobileOverlayName');
     const loopBtn = $id('playlistLoopBtn');
+    const spotifyLinkEl = $id('playlistSidebarLink');
+    const youtubeLinkEl = $id('playlistSidebarYouTubeLink');
     const countStr = `${count} track${count !== 1 ? 's' : ''}`;
     if (nameEl) nameEl.textContent = name;
     if (countEl) countEl.textContent = countStr;
     if (mobileNameEl) mobileNameEl.textContent = name;
+    if (spotifyLinkEl) {
+      const spotifyUrl = sourceLinks?.spotify || null;
+      if (spotifyUrl) {
+        spotifyLinkEl.href = spotifyUrl;
+        spotifyLinkEl.title = 'Open on Spotify';
+        spotifyLinkEl.setAttribute('aria-label', 'Open on Spotify');
+        spotifyLinkEl.classList.remove('hidden');
+      } else {
+        spotifyLinkEl.href = '#';
+        spotifyLinkEl.classList.add('hidden');
+      }
+    }
+    if (youtubeLinkEl) {
+      const youtubeUrl = sourceLinks?.youtube || null;
+      if (youtubeUrl) {
+        youtubeLinkEl.href = youtubeUrl;
+        youtubeLinkEl.title = 'Open on YouTube';
+        youtubeLinkEl.setAttribute('aria-label', 'Open on YouTube');
+        youtubeLinkEl.classList.remove('hidden');
+      } else {
+        youtubeLinkEl.href = '#';
+        youtubeLinkEl.classList.add('hidden');
+      }
+    }
     if (loopBtn) loopBtn.onclick = onToggleLoop;
     document.body.classList.add('playlist-open');
 
@@ -201,7 +227,11 @@ export function createPlaylistView({ onJumpToTrack, onToggleLoop }) {
     stopPanelHeightSync();
     document.body.classList.remove('playlist-open');
     const loopBtn = $id('playlistLoopBtn');
+    const spotifyLinkEl = $id('playlistSidebarLink');
+    const youtubeLinkEl = $id('playlistSidebarYouTubeLink');
     if (loopBtn) loopBtn.onclick = null;
+    if (spotifyLinkEl) { spotifyLinkEl.href = '#'; spotifyLinkEl.classList.add('hidden'); }
+    if (youtubeLinkEl) { youtubeLinkEl.href = '#'; youtubeLinkEl.classList.add('hidden'); }
     const list = $id('playlistTrackList');
     if (list) list.innerHTML = '';
     const mobileList = $id('playlistMobileTrackList');
