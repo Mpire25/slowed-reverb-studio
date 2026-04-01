@@ -169,6 +169,11 @@ async function startPlaylistLoad(url) {
         toast('Connect your Spotify account in Settings to import playlists.', 6000, 'error');
         $id('settingsPanel').classList.add('open');
         $id('overlay').classList.add('open');
+        const group = document.querySelector('.spotify-connect-group');
+        if (group) {
+          setTimeout(() => group.classList.add('setting-highlight'), 300);
+          setTimeout(() => group.classList.remove('setting-highlight'), 3000);
+        }
         return;
       }
       throw new Error(data.error || 'Failed to load playlist');

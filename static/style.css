@@ -411,6 +411,8 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
   outline-offset:2px;
 }
 /* ── Spotify connect ── */
+@keyframes setting-blink{0%,22%,44%,100%{outline-color:transparent}11%,33%{outline-color:rgba(var(--accent1-rgb),.6)}}
+.setting-highlight{animation:setting-blink 2.6s ease;border-radius:10px;outline:3px solid transparent;outline-offset:8px}
 .spotify-connect-group{display:flex;flex-direction:column;gap:10px}
 .spotify-status-row{display:flex;align-items:center;gap:8px}
 .spotify-status-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .3s}
