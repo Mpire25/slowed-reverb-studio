@@ -60,9 +60,9 @@ The gear icon (top right) opens settings to change default slider values.
 
 When the backend is running, a URL import field appears below the drop zone. Paste any YouTube video URL or Spotify track/album/playlist URL — the studio streams live download progress directly in the UI.
 
-Importing a Spotify album or a YouTube Music album/playlist opens a **playlist panel** alongside the studio. Tracks download progressively in the background; the studio auto-advances to the next track when one finishes. Use the **Prev/Next** transport buttons to skip, and toggle **Loop** to wrap back to the start. The number of tracks preloaded ahead can be adjusted in Settings.
+Importing a Spotify album/playlist or a YouTube Music album/playlist opens a **playlist panel** alongside the studio. Tracks download progressively in the background; the studio auto-advances to the next track when one finishes. Use the **Prev/Next** transport buttons to skip, and toggle **Loop** to wrap back to the start. The number of tracks preloaded ahead can be adjusted in Settings.
 
-> Note: Spotify playlist URLs are not currently supported — use Spotify album URLs instead.
+The playlist panel header shows source links when available (Spotify, YouTube, or both).
 
 ---
 
@@ -107,7 +107,8 @@ slowed-reverb-studio/
 - Export renders via `OfflineAudioContext` then encodes to MP3 with a hand-written ID3v2.3 tag prepended
 - Speed change intentionally shifts pitch (no pitch correction) — this is the slowed & reverb sound
 - YouTube downloads use yt-dlp with Android/web player clients to avoid 403s
-- Spotify uses the Client Credentials API flow — no user login required
+- Spotify track/album imports use the Client Credentials API flow
+- Spotify playlist imports require connecting your Spotify account in Settings (OAuth)
 
 ### lame.min.js
 
