@@ -265,7 +265,27 @@ def playlist_info():
         else:
             return jsonify({"error": "URL is not a supported playlist"}), 400
     except Exception as e:
-        return jsonify({"error": clean_error_message(str(e))}), 500
+        msg = clean_error_message(str(e))
+        if (
+            msg == "spotify_auth_required"
+            or "Failed to refresh Spotify token" in msg
+            or "Spotify API 401" in msg
+        ):
+            return jsonify({"error": "spotify_auth_required"}), 403
+        if "Spotify API 403" in msg:
+            return jsonify({
+                "error": (
+                    "Spotify denied playlist track access. Reconnect Spotify, "
+                    "then try a playlist your account can access."
+                )
+            }), 403
+        if "Spotify API 404" in msg:
+            return jsonify({
+                "error": "Spotify couldn't find that playlist for your account."
+            }), 404
+        if msg in ("Invalid Spotify URL", "Playlist is empty"):
+            return jsonify({"error": msg}), 400
+        return jsonify({"error": msg}), 500
 
 
 @app.route("/api/download/track")

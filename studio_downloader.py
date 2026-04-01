@@ -9,6 +9,7 @@ import os
 import re
 import json
 import base64
+import html as html_lib
 import subprocess
 import urllib.request
 import urllib.parse
@@ -99,16 +100,223 @@ def _spotify_user_token():
 
 def _spotify_get(path, token):
     import urllib.error
-    req = urllib.request.Request(
-        f"https://api.spotify.com/v1{path}",
-        headers={"Authorization": f"Bearer {token}"},
-    )
+    if path.startswith("http://") or path.startswith("https://"):
+        url = path
+    else:
+        url = f"https://api.spotify.com/v1{path}"
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
     try:
         with urllib.request.urlopen(req) as resp:
             return json.loads(resp.read())
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"Spotify API {e.code}: {body}") from None
+
+
+_SPOTIFY_SONG_META_RE = re.compile(
+    r'<meta[^>]+name=["\']music:song["\'][^>]+content=["\']https://open\.spotify\.com/track/([A-Za-z0-9]+)["\']',
+    re.IGNORECASE,
+)
+
+
+def _spotify_track_payload_to_dict(track_payload):
+    """Normalise Spotify track payloads into the downloader's track shape."""
+    if not isinstance(track_payload, dict):
+        return None
+    if track_payload.get("type") not in (None, "track"):
+        return None
+    if not track_payload.get("name"):
+        return None
+    album_obj = track_payload.get("album")
+    if not isinstance(album_obj, dict):
+        album_obj = {}
+    images = album_obj.get("images")
+    if not isinstance(images, list):
+        images = []
+    artists = track_payload.get("artists")
+    if not isinstance(artists, list):
+        artists = []
+    first_artist = artists[0] if artists and isinstance(artists[0], dict) else {}
+    artist_name = first_artist.get("name") or "Unknown"
+    return {
+        "name": track_payload["name"],
+        "artist": artist_name,
+        "album": album_obj.get("name", ""),
+        "duration_ms": track_payload.get("duration_ms", 0),
+        "image_url": images[0]["url"] if images else None,
+    }
+
+
+def _spotify_extract_playlist_tracks(payload):
+    """
+    Extract track entries from either legacy `tracks.items` payloads
+    or newer `items.items` payloads.
+    """
+    containers = []
+    if isinstance(payload.get("tracks"), dict):
+        containers.append(payload["tracks"].get("items") or [])
+    if isinstance(payload.get("items"), dict):
+        containers.append(payload["items"].get("items") or [])
+    tracks = []
+    for entries in containers:
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            track_payload = entry.get("track")
+            if not isinstance(track_payload, dict):
+                track_payload = entry.get("item")
+            if not isinstance(track_payload, dict) and entry.get("name"):
+                track_payload = entry
+            track = _spotify_track_payload_to_dict(track_payload)
+            if track:
+                tracks.append(track)
+    return tracks
+
+
+def _spotify_playlist_next_url(payload):
+    for key in ("items", "tracks"):
+        container = payload.get(key)
+        if isinstance(container, dict):
+            next_url = container.get("next")
+            if next_url:
+                return next_url
+    return None
+
+
+def _spotify_fetch_playlist_tracks_via_items_api(sid, token):
+    tracks = []
+    page = _spotify_get(f"/playlists/{sid}/items?limit=100&offset=0", token)
+    while True:
+        tracks.extend(_spotify_extract_playlist_tracks(page))
+        next_url = _spotify_playlist_next_url(page)
+        if not next_url:
+            break
+        page = _spotify_get(next_url, token)
+    return tracks
+
+
+def _spotify_get_tracks_by_ids(track_ids, token):
+    tracks = []
+    cache = {}
+    for track_id in track_ids:
+        if track_id in cache:
+            raw = cache[track_id]
+        else:
+            try:
+                raw = _spotify_get(f"/tracks/{track_id}", token)
+            except RuntimeError:
+                raw = None
+            cache[track_id] = raw
+        track = _spotify_track_payload_to_dict(raw)
+        if track:
+            tracks.append(track)
+    return tracks
+
+
+def _html_meta_content(html_text, attr_name, attr_value):
+    attr_value = re.escape(attr_value)
+    p1 = re.compile(
+        rf'<meta[^>]+{attr_name}=["\']{attr_value}["\'][^>]+content=["\']([^"\']+)["\']',
+        re.IGNORECASE,
+    )
+    m = p1.search(html_text)
+    if not m:
+        p2 = re.compile(
+            rf'<meta[^>]+content=["\']([^"\']+)["\'][^>]+{attr_name}=["\']{attr_value}["\']',
+            re.IGNORECASE,
+        )
+        m = p2.search(html_text)
+    return html_lib.unescape(m.group(1)).strip() if m else None
+
+
+def _spotify_playlist_from_public_page(sid, token):
+    """
+    Fallback for public playlists where Spotify's playlist-items API is blocked.
+    Uses open.spotify.com metadata to gather track IDs.
+    """
+    page_url = f"https://open.spotify.com/playlist/{sid}"
+    req = urllib.request.Request(
+        page_url,
+        headers={"User-Agent": "Mozilla/5.0"},
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            html_text = resp.read().decode("utf-8", errors="replace")
+    except Exception as e:
+        raise RuntimeError(f"Could not fetch public Spotify playlist page: {e}") from None
+
+    track_ids = _SPOTIFY_SONG_META_RE.findall(html_text)
+    if not track_ids:
+        raise RuntimeError("Spotify playlist is private or unavailable to your account")
+
+    # Public track lookups are often available with app credentials even when playlist-items aren't.
+    track_token = token
+    try:
+        tracks = _spotify_get_tracks_by_ids(track_ids, track_token)
+    except Exception:
+        track_token = _spotify_token()
+        tracks = _spotify_get_tracks_by_ids(track_ids, track_token)
+
+    if not tracks:
+        raise RuntimeError("Spotify playlist has no playable tracks")
+
+    playlist_name = _html_meta_content(html_text, "property", "og:title") or "Spotify Playlist"
+    playlist_image = _html_meta_content(html_text, "property", "og:image") or tracks[0].get("image_url")
+    return tracks, {"name": playlist_name, "type": "playlist", "image_url": playlist_image}
+
+
+def _spotify_get_playlist_tracks(sid, token):
+    """
+    Get Spotify playlist tracks, supporting both legacy (`tracks`) and newer (`items`) payload shapes.
+    Falls back to scraping open.spotify.com metadata for public playlists.
+    """
+    playlist_name = "Spotify Playlist"
+    playlist_image = None
+    tracks = []
+    api_error = None
+
+    try:
+        meta = _spotify_get(f"/playlists/{sid}", token)
+        playlist_name = meta.get("name") or playlist_name
+        images = meta.get("images")
+        if isinstance(images, list) and images:
+            playlist_image = images[0].get("url")
+
+        tracks.extend(_spotify_extract_playlist_tracks(meta))
+        next_url = _spotify_playlist_next_url(meta)
+        while next_url:
+            page = _spotify_get(next_url, token)
+            tracks.extend(_spotify_extract_playlist_tracks(page))
+            next_url = _spotify_playlist_next_url(page)
+    except RuntimeError as e:
+        api_error = e
+
+    if not tracks:
+        try:
+            tracks = _spotify_fetch_playlist_tracks_via_items_api(sid, token)
+        except RuntimeError as e:
+            api_error = e
+
+    if not tracks:
+        try:
+            fallback_tracks, fallback_meta = _spotify_playlist_from_public_page(sid, token)
+            if fallback_meta.get("name"):
+                playlist_name = fallback_meta["name"]
+            if fallback_meta.get("image_url"):
+                playlist_image = fallback_meta["image_url"]
+            tracks = fallback_tracks
+        except RuntimeError:
+            if api_error:
+                raise api_error
+            raise
+
+    if not tracks:
+        raise RuntimeError("Spotify playlist is empty")
+    if not playlist_image:
+        playlist_image = tracks[0].get("image_url")
+    return tracks, {"name": playlist_name, "type": "playlist", "image_url": playlist_image}
 
 
 def _get_spotify_tracks(url, token):
@@ -152,32 +360,8 @@ def _get_spotify_tracks(url, token):
         return tracks, {"name": album_name, "artist": artist, "type": "album",
                         "image_url": image_url}
 
-    else:  # playlist — requires user OAuth token
-        meta = _spotify_get(f"/playlists/{sid}", token)
-        playlist_images = meta.get("images", [])
-        tracks = []
-        offset = 0
-        total = None
-        while total is None or offset < total:
-            page = _spotify_get(f"/playlists/{sid}/tracks?limit=50&offset={offset}", token)
-            if total is None:
-                total = page["total"]
-            for item in page["items"]:
-                t = item.get("track")
-                if t and t.get("name"):
-                    images = t.get("album", {}).get("images", [])
-                    tracks.append({
-                        "name": t["name"],
-                        "artist": t["artists"][0]["name"] if t.get("artists") else "Unknown",
-                        "album": t.get("album", {}).get("name", ""),
-                        "duration_ms": t.get("duration_ms", 0),
-                        "image_url": images[0]["url"] if images else None,
-                    })
-            offset += 50
-        playlist_image = playlist_images[0]["url"] if playlist_images else (
-            tracks[0]["image_url"] if tracks else None
-        )
-        return tracks, {"name": meta["name"], "type": "playlist", "image_url": playlist_image}
+    else:  # playlist — requires user OAuth token for private lists
+        return _spotify_get_playlist_tracks(sid, token)
 
 
 # ── YouTube Music search ───────────────────────────────────────────────────────
