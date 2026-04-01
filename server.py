@@ -91,7 +91,16 @@ def _save_env_key(key, value):
     env_path.write_text("\n".join(new_lines) + ("\n" if new_lines else ""))
 
 
-_oauth_state = None
+_oauth_state_lock = threading.Lock()
+_oauth_states = {}
+_OAUTH_STATE_TTL_SECONDS = 10 * 60
+
+
+def _prune_oauth_states(now=None):
+    now = time.time() if now is None else now
+    expired = [s for s, expires_at in _oauth_states.items() if expires_at <= now]
+    for s in expired:
+        _oauth_states.pop(s, None)
 
 
 def _spotify_redirect_uri():
@@ -102,29 +111,34 @@ def _spotify_redirect_uri():
 
 @app.route("/spotify/auth")
 def spotify_auth():
-    global _oauth_state
     client_id = os.environ.get("SPOTIFY_CLIENT_ID", "")
     if not client_id:
         return jsonify({"error": "SPOTIFY_CLIENT_ID not set in .env"}), 400
     redirect_uri = _spotify_redirect_uri()
-    _oauth_state = secrets.token_hex(16)
+    oauth_state = secrets.token_hex(16)
+    with _oauth_state_lock:
+        _prune_oauth_states()
+        _oauth_states[oauth_state] = time.time() + _OAUTH_STATE_TTL_SECONDS
     params = urllib.parse.urlencode({
         "client_id": client_id,
         "response_type": "code",
         "redirect_uri": redirect_uri,
         "scope": "playlist-read-private playlist-read-collaborative",
-        "state": _oauth_state,
+        "state": oauth_state,
     })
     return jsonify({"url": f"https://accounts.spotify.com/authorize?{params}"})
 
 
 @app.route("/spotify/callback")
 def spotify_callback():
-    global _oauth_state
     error = request.args.get("error")
     if error:
         return f"<html><body><p>Auth failed: {error}</p><script>window.close();</script></body></html>"
-    if request.args.get("state") != _oauth_state:
+    state = request.args.get("state", "")
+    with _oauth_state_lock:
+        _prune_oauth_states()
+        expires_at = _oauth_states.pop(state, None)
+    if not state or not expires_at:
         return "Invalid state", 400
     code = request.args.get("code", "")
     client_id = os.environ.get("SPOTIFY_CLIENT_ID", "")
