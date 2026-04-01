@@ -158,13 +158,18 @@ def _spotify_track_payload_to_dict(track_payload):
 
 def _spotify_extract_playlist_tracks(payload):
     """
-    Extract track entries from either legacy `tracks.items` payloads
-    or newer `items.items` payloads.
+    Extract track entries from Spotify playlist payloads.
+    Supports:
+    - /playlists/{id} style payloads with `tracks.items`
+    - paged payloads with top-level `items` list
+    - nested `items.items` variants
     """
     containers = []
     if isinstance(payload.get("tracks"), dict):
         containers.append(payload["tracks"].get("items") or [])
-    if isinstance(payload.get("items"), dict):
+    if isinstance(payload.get("items"), list):
+        containers.append(payload.get("items") or [])
+    elif isinstance(payload.get("items"), dict):
         containers.append(payload["items"].get("items") or [])
     tracks = []
     for entries in containers:
@@ -185,6 +190,12 @@ def _spotify_extract_playlist_tracks(payload):
 
 
 def _spotify_playlist_next_url(payload):
+    # Common Spotify paging shape: top-level `next`.
+    next_url = payload.get("next")
+    if next_url:
+        return next_url
+
+    # Also support nested paging containers.
     for key in ("items", "tracks"):
         container = payload.get(key)
         if isinstance(container, dict):
