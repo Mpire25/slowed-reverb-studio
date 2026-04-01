@@ -15,7 +15,7 @@ async function refreshStatus() {
   }
 }
 
-function _render(connected, callbackUrl) {
+function _render(connected, callbackUrl = '') {
   const dot = $id('spotifyStatusDot');
   const label = $id('spotifyStatusLabel');
   const hint = $id('spotifyConnectHint');
@@ -26,7 +26,11 @@ function _render(connected, callbackUrl) {
   label.textContent = connected ? 'Connected' : 'Not connected';
   hint.textContent = connected
     ? 'Spotify playlists are enabled.'
-    : `Connect your Spotify account to import playlists. You'll need to add ${callbackUrl} as a Redirect URI in your Spotify app dashboard first.`;
+    : (
+      callbackUrl
+        ? `Connect your Spotify account to import playlists. You'll need to add ${callbackUrl} as a Redirect URI in your Spotify app dashboard first.`
+        : 'Connect your Spotify account to import playlists.'
+    );
   connectBtn.style.display = connected ? 'none' : '';
   disconnectBtn.style.display = connected ? '' : 'none';
 }
@@ -59,7 +63,7 @@ export function initSpotifyAuth() {
 
   $id('spotifyDisconnectBtn').addEventListener('click', async () => {
     await fetch(`${SERVER}/spotify/disconnect`, { method: 'POST' });
-    _render(false);
+    await refreshStatus();
   });
 }
 
