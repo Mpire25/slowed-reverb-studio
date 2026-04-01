@@ -5,6 +5,7 @@ Runs on port 7337. Provides SSE-based download streaming and file serving.
 """
 
 import base64
+import html
 import json
 import os
 import queue
@@ -112,8 +113,11 @@ def _spotify_redirect_uri():
 @app.route("/spotify/auth")
 def spotify_auth():
     client_id = os.environ.get("SPOTIFY_CLIENT_ID", "")
-    if not client_id:
-        return jsonify({"error": "SPOTIFY_CLIENT_ID not set in .env"}), 400
+    client_secret = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
+    if not client_id or not client_secret:
+        return jsonify({
+            "error": "SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET must be set in .env"
+        }), 400
     redirect_uri = _spotify_redirect_uri()
     oauth_state = secrets.token_hex(16)
     with _oauth_state_lock:
@@ -133,7 +137,12 @@ def spotify_auth():
 def spotify_callback():
     error = request.args.get("error")
     if error:
-        return f"<html><body><p>Auth failed: {error}</p><script>window.close();</script></body></html>"
+        safe_error = html.escape(error)
+        return (
+            "<html><body><p>Auth failed: "
+            f"{safe_error}"
+            "</p><script>window.close();</script></body></html>"
+        )
     state = request.args.get("state", "")
     with _oauth_state_lock:
         _prune_oauth_states()
@@ -143,6 +152,16 @@ def spotify_callback():
     code = request.args.get("code", "")
     client_id = os.environ.get("SPOTIFY_CLIENT_ID", "")
     client_secret = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
+    if not client_id or not client_secret:
+        return (
+            "<html><body><p>Spotify OAuth is not configured correctly on this server.</p>"
+            "<script>window.close();</script></body></html>"
+        ), 500
+    if not code:
+        return (
+            "<html><body><p>Spotify did not return an authorization code.</p>"
+            "<script>window.close();</script></body></html>"
+        ), 400
     redirect_uri = _spotify_redirect_uri()
     creds = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
     data = urllib.parse.urlencode({
@@ -158,12 +177,28 @@ def spotify_callback():
     try:
         with urllib.request.urlopen(req) as resp:
             result = json.loads(resp.read())
-    except Exception as e:
-        return f"<html><body><p>Token exchange failed: {e}</p></body></html>", 500
+    except Exception:
+        app.logger.exception("Spotify token exchange failed")
+        return (
+            "<html><body><p>Could not complete Spotify authorization. "
+            "Please try again.</p><script>window.close();</script></body></html>"
+        ), 500
+    if result.get("error"):
+        app.logger.error("Spotify token endpoint returned error: %s", result.get("error"))
+        return (
+            "<html><body><p>Spotify authorization failed. Please try again.</p>"
+            "<script>window.close();</script></body></html>"
+        ), 400
     refresh_token = result.get("refresh_token", "")
-    if refresh_token:
-        _save_env_key("SPOTIFY_REFRESH_TOKEN", refresh_token)
-        os.environ["SPOTIFY_REFRESH_TOKEN"] = refresh_token
+    if not refresh_token:
+        app.logger.error("Spotify token response did not include refresh_token")
+        return (
+            "<html><body><p>Spotify did not return a refresh token. "
+            "Please reconnect and ensure your app settings are correct.</p>"
+            "<script>window.close();</script></body></html>"
+        ), 400
+    _save_env_key("SPOTIFY_REFRESH_TOKEN", refresh_token)
+    os.environ["SPOTIFY_REFRESH_TOKEN"] = refresh_token
     return """<html><head><title>Spotify Connected</title></head><body>
 <p style="font-family:sans-serif;padding:20px">Spotify connected! You can close this window.</p>
 <script>window.close();</script>
