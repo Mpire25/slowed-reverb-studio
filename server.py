@@ -90,8 +90,7 @@ def spotify_auth():
     client_id = os.environ.get("SPOTIFY_CLIENT_ID", "")
     if not client_id:
         return jsonify({"error": "SPOTIFY_CLIENT_ID not set in .env"}), 400
-    port = int(os.environ.get("PORT", 7337))
-    redirect_uri = f"http://localhost:{port}/spotify/callback"
+    redirect_uri = f"{request.scheme}://{request.host}/spotify/callback"
     _oauth_state = secrets.token_hex(16)
     params = urllib.parse.urlencode({
         "client_id": client_id,
@@ -114,8 +113,7 @@ def spotify_callback():
     code = request.args.get("code", "")
     client_id = os.environ.get("SPOTIFY_CLIENT_ID", "")
     client_secret = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
-    port = int(os.environ.get("PORT", 7337))
-    redirect_uri = f"http://localhost:{port}/spotify/callback"
+    redirect_uri = f"{request.scheme}://{request.host}/spotify/callback"
     creds = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
     data = urllib.parse.urlencode({
         "grant_type": "authorization_code",
@@ -145,7 +143,10 @@ def spotify_callback():
 @app.route("/spotify/status")
 def spotify_status():
     connected = bool(os.environ.get("SPOTIFY_REFRESH_TOKEN", ""))
-    return jsonify({"connected": connected})
+    return jsonify({
+        "connected": connected,
+        "callback_url": f"{request.scheme}://{request.host}/spotify/callback",
+    })
 
 
 @app.route("/spotify/disconnect", methods=["POST"])

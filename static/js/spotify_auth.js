@@ -6,15 +6,15 @@ let _pollTimer = null;
 async function refreshStatus() {
   try {
     const res = await fetch(`${SERVER}/spotify/status`);
-    const { connected } = await res.json();
-    _render(connected);
-    return connected;
+    const data = await res.json();
+    _render(data.connected, data.callback_url);
+    return data.connected;
   } catch {
     return null;
   }
 }
 
-function _render(connected) {
+function _render(connected, callbackUrl) {
   const dot = $id('spotifyStatusDot');
   const label = $id('spotifyStatusLabel');
   const hint = $id('spotifyConnectHint');
@@ -25,7 +25,7 @@ function _render(connected) {
   label.textContent = connected ? 'Connected' : 'Not connected';
   hint.textContent = connected
     ? 'Spotify playlists are enabled.'
-    : 'Connect your Spotify account to import playlists. You\'ll need to add http://localhost:7337/spotify/callback as a Redirect URI in your Spotify app dashboard first.';
+    : `Connect your Spotify account to import playlists. You'll need to add ${callbackUrl} as a Redirect URI in your Spotify app dashboard first.`;
   connectBtn.style.display = connected ? 'none' : '';
   disconnectBtn.style.display = connected ? '' : 'none';
 }
