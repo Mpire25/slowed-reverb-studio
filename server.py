@@ -5,6 +5,7 @@ Runs on port 7337. Provides SSE-based download streaming and file serving.
 """
 
 import base64
+import hashlib
 import html
 import json
 import os
@@ -99,9 +100,29 @@ _OAUTH_STATE_TTL_SECONDS = 10 * 60
 
 def _prune_oauth_states(now=None):
     now = time.time() if now is None else now
-    expired = [s for s, expires_at in _oauth_states.items() if expires_at <= now]
+    expired = []
+    for s, entry in _oauth_states.items():
+        if isinstance(entry, dict):
+            expires_at = entry.get("expires_at", 0)
+        else:
+            expires_at = entry
+        if expires_at <= now:
+            expired.append(s)
     for s in expired:
         _oauth_states.pop(s, None)
+
+
+def _pkce_code_verifier():
+    # RFC 7636: verifier must be 43-128 chars from URL-safe unreserved chars.
+    verifier = secrets.token_urlsafe(96).rstrip("=")
+    if len(verifier) < 43:
+        verifier = (verifier + secrets.token_urlsafe(43))[:43]
+    return verifier[:128]
+
+
+def _pkce_code_challenge(verifier):
+    digest = hashlib.sha256(verifier.encode("utf-8")).digest()
+    return base64.urlsafe_b64encode(digest).decode("ascii").rstrip("=")
 
 
 def _spotify_redirect_uri():
@@ -120,15 +141,22 @@ def spotify_auth():
         }), 400
     redirect_uri = _spotify_redirect_uri()
     oauth_state = secrets.token_hex(16)
+    code_verifier = _pkce_code_verifier()
+    code_challenge = _pkce_code_challenge(code_verifier)
     with _oauth_state_lock:
         _prune_oauth_states()
-        _oauth_states[oauth_state] = time.time() + _OAUTH_STATE_TTL_SECONDS
+        _oauth_states[oauth_state] = {
+            "expires_at": time.time() + _OAUTH_STATE_TTL_SECONDS,
+            "code_verifier": code_verifier,
+        }
     params = urllib.parse.urlencode({
         "client_id": client_id,
         "response_type": "code",
         "redirect_uri": redirect_uri,
         "scope": "playlist-read-private playlist-read-collaborative",
         "state": oauth_state,
+        "code_challenge_method": "S256",
+        "code_challenge": code_challenge,
     })
     return jsonify({"url": f"https://accounts.spotify.com/authorize?{params}"})
 
@@ -146,8 +174,12 @@ def spotify_callback():
     state = request.args.get("state", "")
     with _oauth_state_lock:
         _prune_oauth_states()
-        expires_at = _oauth_states.pop(state, None)
-    if not state or not expires_at:
+        oauth_entry = _oauth_states.pop(state, None)
+    if isinstance(oauth_entry, dict):
+        code_verifier = oauth_entry.get("code_verifier", "")
+    else:
+        code_verifier = ""
+    if not state or not oauth_entry or not code_verifier:
         return "Invalid state", 400
     code = request.args.get("code", "")
     client_id = os.environ.get("SPOTIFY_CLIENT_ID", "")
@@ -168,6 +200,7 @@ def spotify_callback():
         "grant_type": "authorization_code",
         "code": code,
         "redirect_uri": redirect_uri,
+        "code_verifier": code_verifier,
     }).encode()
     req = urllib.request.Request(
         "https://accounts.spotify.com/api/token",
