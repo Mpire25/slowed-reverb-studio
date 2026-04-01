@@ -194,18 +194,6 @@ def _spotify_playlist_next_url(payload):
     return None
 
 
-def _spotify_fetch_playlist_tracks_via_items_api(sid, token):
-    tracks = []
-    page = _spotify_get(f"/playlists/{sid}/items?limit=100&offset=0", token)
-    while True:
-        tracks.extend(_spotify_extract_playlist_tracks(page))
-        next_url = _spotify_playlist_next_url(page)
-        if not next_url:
-            break
-        page = _spotify_get(next_url, token)
-    return tracks
-
-
 def _spotify_get_tracks_by_ids(track_ids, token):
     tracks = []
     cache = {}
@@ -301,12 +289,6 @@ def _spotify_get_playlist_tracks(sid, token):
             next_url = _spotify_playlist_next_url(page)
     except RuntimeError as e:
         api_error = e
-
-    if not tracks:
-        try:
-            tracks = _spotify_fetch_playlist_tracks_via_items_api(sid, token)
-        except RuntimeError as e:
-            api_error = e
 
     if not tracks:
         try:
