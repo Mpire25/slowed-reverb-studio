@@ -162,7 +162,17 @@ async function startPlaylistLoad(url) {
   try {
     const res = await fetch(`${SERVER}/api/playlist/info?url=${encodeURIComponent(url)}`);
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to load playlist');
+    if (!res.ok) {
+      if (data.error === 'spotify_auth_required') {
+        view.restoreInputs();
+        view.hideStatus();
+        toast('Connect your Spotify account in Settings to import playlists.', 6000, 'error');
+        $id('settingsPanel').classList.add('open');
+        $id('overlay').classList.add('open');
+        return;
+      }
+      throw new Error(data.error || 'Failed to load playlist');
+    }
 
     if (!data.tracks || data.tracks.length === 0) {
       throw new Error('Playlist is empty');
