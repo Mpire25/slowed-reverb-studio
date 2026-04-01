@@ -426,7 +426,14 @@ function _teardown() {
 // ── Internal: panel UI ─────────────────────────────────────────────────────────
 
 function _openPanel(name, count) {
-  view.openPanel(name, count, ps.loopEnabled, ps.sourceUrl);
+  const youtubeTrack = ps.tracks.find(t => t.youtube_url || t.video_id) || null;
+  const sourceLinks = {
+    spotify: /spotify/i.test(ps.sourceUrl || '') ? ps.sourceUrl : null,
+    youtube: /music\.youtube\.com/i.test(ps.sourceUrl || '')
+      ? ps.sourceUrl
+      : (youtubeTrack?.youtube_url || (youtubeTrack?.video_id ? `https://www.youtube.com/watch?v=${youtubeTrack.video_id}` : null)),
+  };
+  view.openPanel(name, count, ps.loopEnabled, sourceLinks);
 }
 
 function _closePanelUI() {

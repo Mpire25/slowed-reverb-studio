@@ -227,6 +227,7 @@ def playlist_info():
             is_youtube_music_playlist,
             _get_spotify_tracks,
             _spotify_token,
+            _apply_album_match_video_ids,
         )
         if "spotify.com" in url:
             from studio_downloader import has_spotify_oauth, _spotify_user_token
@@ -238,6 +239,8 @@ def playlist_info():
             else:
                 token = _spotify_token()
             tracks, meta = _get_spotify_tracks(url, token)
+            if meta.get("type") == "album":
+                _apply_album_match_video_ids(tracks, meta)
             return jsonify({
                 "name": meta.get("name", ""),
                 "type": meta.get("type", "spotify_playlist"),

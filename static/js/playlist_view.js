@@ -1,9 +1,6 @@
 import { fmt, escapeHtml } from './utils.js';
 import { $id } from './dom.js';
 
-const SPOTIFY_ICON_PATH = 'M12 1.5A10.5 10.5 0 1 0 22.5 12 10.5 10.5 0 0 0 12 1.5Zm4.85 15.15a.9.9 0 0 1-1.24.3 9.55 9.55 0 0 0-7.97-.98.9.9 0 1 1-.56-1.71 11.34 11.34 0 0 1 9.47 1.17.9.9 0 0 1 .3 1.22Zm1.28-2.83a1.12 1.12 0 0 1-1.54.37 11.84 11.84 0 0 0-9.87-1.22 1.12 1.12 0 1 1-.67-2.14 14.07 14.07 0 0 1 11.72 1.45 1.12 1.12 0 0 1 .36 1.54Zm.15-3.04A14.2 14.2 0 0 0 6.41 9.25a1.35 1.35 0 0 1-.8-2.58 16.89 16.89 0 0 1 14.11 1.79 1.35 1.35 0 1 1-1.44 2.32Z';
-const YOUTUBE_ICON_PATH = 'M21.58 7.19a2.96 2.96 0 0 0-2.08-2.1C17.66 4.5 12 4.5 12 4.5s-5.66 0-7.5.59a2.96 2.96 0 0 0-2.08 2.1A30.8 30.8 0 0 0 1.9 12a30.8 30.8 0 0 0 .52 4.81 2.96 2.96 0 0 0 2.08 2.1c1.84.59 7.5.59 7.5.59s5.66 0 7.5-.59a2.96 2.96 0 0 0 2.08-2.1A30.8 30.8 0 0 0 22.1 12a30.8 30.8 0 0 0-.52-4.81ZM10.2 15.08V8.92L15.6 12Z';
-
 function _makeTrackRow(track, onJumpToTrack) {
   const row = document.createElement('div');
   row.className = 'pl-row';
@@ -172,32 +169,39 @@ export function createPlaylistView({ onJumpToTrack, onToggleLoop }) {
     }
   }
 
-  function openPanel(name, count, loopEnabled, sourceUrl = null) {
+  function openPanel(name, count, loopEnabled, sourceLinks = null) {
     const nameEl = $id('playlistSidebarName');
     const countEl = $id('playlistSidebarCount');
     const mobileNameEl = $id('playlistMobileOverlayName');
     const loopBtn = $id('playlistLoopBtn');
-    const sourceLinkEl = $id('playlistSidebarLink');
+    const spotifyLinkEl = $id('playlistSidebarLink');
+    const youtubeLinkEl = $id('playlistSidebarYouTubeLink');
     const countStr = `${count} track${count !== 1 ? 's' : ''}`;
     if (nameEl) nameEl.textContent = name;
     if (countEl) countEl.textContent = countStr;
     if (mobileNameEl) mobileNameEl.textContent = name;
-    if (sourceLinkEl) {
-      const isSpotify = !!sourceUrl && /spotify\.com/i.test(sourceUrl);
-      const isYouTubeMusic = !!sourceUrl && /music\.youtube\.com/i.test(sourceUrl);
-      const sourceIconPath = sourceLinkEl.querySelector('path');
-      if (sourceUrl) {
-        sourceLinkEl.href = sourceUrl;
-        sourceLinkEl.title = isSpotify ? 'Open on Spotify' : (isYouTubeMusic ? 'Open on YouTube Music' : 'Open source');
-        sourceLinkEl.setAttribute('aria-label', sourceLinkEl.title);
-        if (sourceIconPath) sourceIconPath.setAttribute('d', isYouTubeMusic ? YOUTUBE_ICON_PATH : SPOTIFY_ICON_PATH);
-        sourceLinkEl.classList.remove('hidden');
+    if (spotifyLinkEl) {
+      const spotifyUrl = sourceLinks?.spotify || null;
+      if (spotifyUrl) {
+        spotifyLinkEl.href = spotifyUrl;
+        spotifyLinkEl.title = 'Open on Spotify';
+        spotifyLinkEl.setAttribute('aria-label', 'Open on Spotify');
+        spotifyLinkEl.classList.remove('hidden');
       } else {
-        sourceLinkEl.href = '#';
-        sourceLinkEl.title = 'Open source';
-        sourceLinkEl.setAttribute('aria-label', 'Open source');
-        if (sourceIconPath) sourceIconPath.setAttribute('d', SPOTIFY_ICON_PATH);
-        sourceLinkEl.classList.add('hidden');
+        spotifyLinkEl.href = '#';
+        spotifyLinkEl.classList.add('hidden');
+      }
+    }
+    if (youtubeLinkEl) {
+      const youtubeUrl = sourceLinks?.youtube || null;
+      if (youtubeUrl) {
+        youtubeLinkEl.href = youtubeUrl;
+        youtubeLinkEl.title = 'Open on YouTube';
+        youtubeLinkEl.setAttribute('aria-label', 'Open on YouTube');
+        youtubeLinkEl.classList.remove('hidden');
+      } else {
+        youtubeLinkEl.href = '#';
+        youtubeLinkEl.classList.add('hidden');
       }
     }
     if (loopBtn) loopBtn.onclick = onToggleLoop;
@@ -223,12 +227,11 @@ export function createPlaylistView({ onJumpToTrack, onToggleLoop }) {
     stopPanelHeightSync();
     document.body.classList.remove('playlist-open');
     const loopBtn = $id('playlistLoopBtn');
-    const sourceLinkEl = $id('playlistSidebarLink');
+    const spotifyLinkEl = $id('playlistSidebarLink');
+    const youtubeLinkEl = $id('playlistSidebarYouTubeLink');
     if (loopBtn) loopBtn.onclick = null;
-    if (sourceLinkEl) {
-      sourceLinkEl.href = '#';
-      sourceLinkEl.classList.add('hidden');
-    }
+    if (spotifyLinkEl) { spotifyLinkEl.href = '#'; spotifyLinkEl.classList.add('hidden'); }
+    if (youtubeLinkEl) { youtubeLinkEl.href = '#'; youtubeLinkEl.classList.add('hidden'); }
     const list = $id('playlistTrackList');
     if (list) list.innerHTML = '';
     const mobileList = $id('playlistMobileTrackList');

@@ -493,6 +493,160 @@ def _find_youtube_id(track):
     return best_id
 
 
+def _candidate_album_score(result, expected_album, expected_artist):
+    """Quick score for album search candidates before expensive album fetch calls."""
+    album_title = result.get("title", "")
+    core_expected_album = _core_title(expected_album)
+    core_album_title = _core_title(album_title)
+
+    title_score = 0
+    if core_album_title == core_expected_album:
+        title_score = 60
+    elif core_expected_album and core_expected_album in core_album_title:
+        title_score = 30
+
+    artists = result.get("artists") or []
+    artist_blob = " ".join(a.get("name", "") for a in artists)
+    artist_score = 30 if _core_title(expected_artist) in _core_title(artist_blob) else 0
+    return title_score + artist_score
+
+
+def _match_album_tracks(spotify_tracks, ytm_tracks):
+    """
+    Attempt to match Spotify tracks to a YTM album tracklist.
+    Returns (is_confident, mapping_by_spotify_index).
+    """
+    if len(spotify_tracks) != len(ytm_tracks):
+        return False, {}
+
+    ordered_mapping = {}
+    ordered_title_matches = 0
+    duration_matches = 0
+
+    for i, (sp_track, yt_track) in enumerate(zip(spotify_tracks, ytm_tracks)):
+        sp_title = _core_title(sp_track.get("name", ""))
+        yt_title = _core_title(yt_track.get("title", ""))
+        if sp_title and sp_title == yt_title:
+            ordered_title_matches += 1
+
+        sp_duration = (sp_track.get("duration_ms") or 0) // 1000
+        yt_duration = yt_track.get("duration_seconds") or 0
+        if sp_duration > 0 and yt_duration > 0 and abs(sp_duration - yt_duration) <= 15:
+            duration_matches += 1
+
+        video_id = yt_track.get("videoId")
+        if not video_id:
+            return False, {}
+        ordered_mapping[i] = video_id
+
+    min_title_matches = max(1, int(len(spotify_tracks) * 0.8))
+    min_duration_matches = max(1, int(len(spotify_tracks) * 0.6))
+    if ordered_title_matches >= min_title_matches and duration_matches >= min_duration_matches:
+        return True, ordered_mapping
+
+    # Fallback: title-based matching for occasional ordering differences.
+    title_to_indices = {}
+    for idx, yt_track in enumerate(ytm_tracks):
+        title_to_indices.setdefault(_core_title(yt_track.get("title", "")), []).append(idx)
+
+    used_yt_indices = set()
+    mapping = {}
+    title_matches = 0
+    duration_matches = 0
+
+    for sp_idx, sp_track in enumerate(spotify_tracks):
+        key = _core_title(sp_track.get("name", ""))
+        candidate_indices = title_to_indices.get(key, [])
+        chosen = None
+        for yt_idx in candidate_indices:
+            if yt_idx not in used_yt_indices:
+                chosen = yt_idx
+                break
+        if chosen is None:
+            return False, {}
+
+        yt_track = ytm_tracks[chosen]
+        video_id = yt_track.get("videoId")
+        if not video_id:
+            return False, {}
+
+        used_yt_indices.add(chosen)
+        mapping[sp_idx] = video_id
+        title_matches += 1
+
+        sp_duration = (sp_track.get("duration_ms") or 0) // 1000
+        yt_duration = yt_track.get("duration_seconds") or 0
+        if sp_duration > 0 and yt_duration > 0 and abs(sp_duration - yt_duration) <= 15:
+            duration_matches += 1
+
+    min_title_matches = max(1, int(len(spotify_tracks) * 0.9))
+    min_duration_matches = max(1, int(len(spotify_tracks) * 0.7))
+    if title_matches >= min_title_matches and duration_matches >= min_duration_matches:
+        return True, mapping
+
+    return False, {}
+
+
+def _resolve_album_video_ids(spotify_tracks, album_meta):
+    """
+    Find a high-confidence YTM album match and return track-index -> videoId mapping.
+    Returns {} when no confident album-level match is found.
+    """
+    if not spotify_tracks:
+        return {}
+
+    album_name = album_meta.get("name", "")
+    artist_name = album_meta.get("artist", "") or spotify_tracks[0].get("artist", "")
+    query = f"{artist_name} - {album_name}".strip(" -")
+
+    try:
+        ytm = _get_ytmusic()
+        candidates = ytm.search(query, filter="albums", limit=8)
+    except Exception:
+        return {}
+
+    ranked = sorted(
+        (c for c in candidates if isinstance(c, dict) and c.get("browseId")),
+        key=lambda c: _candidate_album_score(c, album_name, artist_name),
+        reverse=True,
+    )[:5]
+
+    if not ranked:
+        return {}
+
+    for candidate in ranked:
+        browse_id = candidate.get("browseId")
+        if not browse_id:
+            continue
+        try:
+            album_data = ytm.get_album(browse_id)
+        except Exception:
+            continue
+
+        ytm_tracks = album_data.get("tracks") or []
+        if not isinstance(ytm_tracks, list):
+            continue
+
+        confident, mapping = _match_album_tracks(spotify_tracks, ytm_tracks)
+        if confident and len(mapping) == len(spotify_tracks):
+            return mapping
+
+    return {}
+
+
+def _apply_album_match_video_ids(spotify_tracks, album_meta):
+    """
+    Mutates spotify_tracks to add `video_id` when a confident album match is found.
+    Returns number of assigned video IDs.
+    """
+    mapping = _resolve_album_video_ids(spotify_tracks, album_meta)
+    if len(mapping) != len(spotify_tracks):
+        return 0
+    for idx, video_id in mapping.items():
+        spotify_tracks[idx]["video_id"] = video_id
+    return len(mapping)
+
+
 # ── Art & tag embedding ────────────────────────────────────────────────────────
 
 def _embed_tags(mp3_path, track):
@@ -731,6 +885,17 @@ def download_spotify(url, on_event):
             for t in tracks
         ],
     })
+
+    if meta.get("type") == "album":
+        on_event("stage", {"stage": "searching",
+                            "message": "Trying album-level match on YouTube Music…"})
+        matched = _apply_album_match_video_ids(tracks, meta)
+        if matched == len(tracks):
+            on_event("stage", {"stage": "searching",
+                                "message": "Found confident album match; using album track IDs."})
+        else:
+            on_event("stage", {"stage": "searching",
+                                "message": "No confident album match; falling back to per-track search."})
 
     results = []
     for i, track in enumerate(tracks):
