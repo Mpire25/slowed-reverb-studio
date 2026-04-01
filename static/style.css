@@ -419,7 +419,7 @@ input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;bor
 .spotify-status-dot.connected{background:#1db954}
 .spotify-status-dot.disconnected{background:var(--muted)}
 .spotify-status-label{font-size:.875rem;color:var(--text)}
-.spotify-connect-hint{font-size:.75rem;color:var(--muted);margin:0;line-height:1.4}
+.spotify-connect-hint{font-size:.68rem;color:var(--muted);margin:0;line-height:1.4}
 .spotify-connect-btn,.spotify-disconnect-btn{
   width:100%;padding:9px 14px;border-radius:10px;border:none;cursor:pointer;
   font-size:.825rem;font-weight:600;transition:opacity .15s;

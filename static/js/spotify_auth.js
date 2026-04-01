@@ -1,5 +1,6 @@
 import { SERVER } from './config.js';
 import { $id } from './dom.js';
+import { toast } from './utils.js';
 
 let _pollTimer = null;
 
@@ -42,7 +43,11 @@ export function initSpotifyAuth() {
       if (_pollTimer) clearInterval(_pollTimer);
       _pollTimer = setInterval(async () => {
         const connected = await refreshStatus();
-        if (connected || (popup && popup.closed)) {
+        if (connected) {
+          clearInterval(_pollTimer);
+          _pollTimer = null;
+          toast('Spotify connected!', 3000, 'success');
+        } else if (popup && popup.closed) {
           clearInterval(_pollTimer);
           _pollTimer = null;
         }
