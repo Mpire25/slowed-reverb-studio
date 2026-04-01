@@ -34,7 +34,7 @@ SPOTIFY_CLIENT_ID=your_client_id
 SPOTIFY_CLIENT_SECRET=your_client_secret
 ```
 
-For Spotify playlist imports, open **Settings** in the app and click **Connect Spotify**.  
+For Spotify playlist imports, open **Settings** in the app and click **Connect Spotify**.
 Before connecting, add the callback URL shown in Settings (for example `http://127.0.0.1:7337/spotify/callback`) to your Spotify app's Redirect URIs.
 
 ### 4. Run the server

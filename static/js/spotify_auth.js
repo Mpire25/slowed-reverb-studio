@@ -44,6 +44,10 @@ export function initSpotifyAuth() {
       const data = await res.json();
       if (data.error) { alert(data.error); return; }
       const popup = window.open(data.url, 'spotify-auth', 'width=500,height=650');
+      if (!popup) {
+        toast('Popup blocked. Allow popups for this site and try again.', 5000, 'error');
+        return;
+      }
       if (_pollTimer) clearInterval(_pollTimer);
       _pollTimer = setInterval(async () => {
         const connected = await refreshStatus();
@@ -55,7 +59,7 @@ export function initSpotifyAuth() {
           clearInterval(_pollTimer);
           _pollTimer = null;
         }
-      }, 1000);
+      }, 2500);
     } catch (e) {
       alert('Failed to start Spotify auth: ' + e.message);
     }
