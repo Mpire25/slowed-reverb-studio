@@ -20,6 +20,7 @@ const ps = {
   active: false,
   loopEnabled: false,
   sourceUrl: null,
+  containerYouTubeUrl: null,
   tracks: [],         // {index, name, artist, album, duration_ms, image_url, video_id?, spotify_url?, youtube_url?, filePath, status, retries}
   currentIndex: -1,
   activeES: null,     // currently open EventSource
@@ -43,6 +44,7 @@ export function initPlaylist(data, sourceUrl, { firstTrackPath = null } = {}) {
   ps.active = true;
   ps.loopEnabled = true;
   ps.sourceUrl = sourceUrl;
+  ps.containerYouTubeUrl = data.youtube_url || null;
   ps.tracks = (data.tracks || []).map((t, i) => ({
     index: i,
     name: t.name || 'Unknown',
@@ -421,17 +423,18 @@ function _teardown() {
   ps.downloadingIndex = -1;
   ps.pendingPlayIndex = -1;
   ps.sourceUrl = null;
+  ps.containerYouTubeUrl = null;
 }
 
 // ── Internal: panel UI ─────────────────────────────────────────────────────────
 
 function _openPanel(name, count) {
-  const youtubeTrack = ps.tracks.find(t => t.youtube_url || t.video_id) || null;
+  const source = ps.sourceUrl || '';
+  const isSpotifySource = /spotify/i.test(source);
+  const isYouTubeSource = /music\.youtube\.com/i.test(source);
   const sourceLinks = {
-    spotify: /spotify/i.test(ps.sourceUrl || '') ? ps.sourceUrl : null,
-    youtube: /music\.youtube\.com/i.test(ps.sourceUrl || '')
-      ? ps.sourceUrl
-      : (youtubeTrack?.youtube_url || (youtubeTrack?.video_id ? `https://www.youtube.com/watch?v=${youtubeTrack.video_id}` : null)),
+    spotify: isSpotifySource ? source : null,
+    youtube: isYouTubeSource ? source : ps.containerYouTubeUrl,
   };
   view.openPanel(name, count, ps.loopEnabled, sourceLinks);
 }

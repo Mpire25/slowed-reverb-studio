@@ -589,11 +589,11 @@ def _match_album_tracks(spotify_tracks, ytm_tracks):
 
 def _resolve_album_video_ids(spotify_tracks, album_meta):
     """
-    Find a high-confidence YTM album match and return track-index -> videoId mapping.
-    Returns {} when no confident album-level match is found.
+    Find a high-confidence YTM album match.
+    Returns (track-index -> videoId mapping, album_container_url_or_none).
     """
     if not spotify_tracks:
-        return {}
+        return {}, None
 
     album_name = album_meta.get("name", "")
     artist_name = album_meta.get("artist", "") or spotify_tracks[0].get("artist", "")
@@ -603,7 +603,7 @@ def _resolve_album_video_ids(spotify_tracks, album_meta):
         ytm = _get_ytmusic()
         candidates = ytm.search(query, filter="albums", limit=8)
     except Exception:
-        return {}
+        return {}, None
 
     ranked = sorted(
         (c for c in candidates if isinstance(c, dict) and c.get("browseId")),
@@ -612,7 +612,7 @@ def _resolve_album_video_ids(spotify_tracks, album_meta):
     )[:5]
 
     if not ranked:
-        return {}
+        return {}, None
 
     for candidate in ranked:
         browse_id = candidate.get("browseId")
@@ -629,21 +629,29 @@ def _resolve_album_video_ids(spotify_tracks, album_meta):
 
         confident, mapping = _match_album_tracks(spotify_tracks, ytm_tracks)
         if confident and len(mapping) == len(spotify_tracks):
-            return mapping
+            playlist_id = album_data.get("audioPlaylistId")
+            if playlist_id:
+                container_url = f"https://music.youtube.com/playlist?list={playlist_id}"
+            else:
+                container_url = f"https://music.youtube.com/browse/{browse_id}"
+            return mapping, container_url
 
-    return {}
+    return {}, None
 
 
 def _apply_album_match_video_ids(spotify_tracks, album_meta):
     """
     Mutates spotify_tracks to add `video_id` when a confident album match is found.
+    Sets album_meta["youtube_url"] to the matched YTM album container URL when available.
     Returns number of assigned video IDs.
     """
-    mapping = _resolve_album_video_ids(spotify_tracks, album_meta)
+    mapping, container_url = _resolve_album_video_ids(spotify_tracks, album_meta)
     if len(mapping) != len(spotify_tracks):
         return 0
     for idx, video_id in mapping.items():
         spotify_tracks[idx]["video_id"] = video_id
+    if container_url:
+        album_meta["youtube_url"] = container_url
     return len(mapping)
 
 

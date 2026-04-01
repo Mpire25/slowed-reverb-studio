@@ -245,6 +245,7 @@ def playlist_info():
                 "name": meta.get("name", ""),
                 "type": meta.get("type", "spotify_playlist"),
                 "image_url": meta.get("image_url"),
+                "youtube_url": meta.get("youtube_url"),
                 "tracks": [
                     {
                         "index": i,
@@ -265,6 +266,7 @@ def playlist_info():
                 "name": meta.get("name", "Playlist"),
                 "type": meta.get("type", "ytmusic_playlist"),
                 "image_url": meta.get("image_url"),
+                "youtube_url": url,
                 "tracks": tracks,
             })
         else:
