@@ -4,12 +4,16 @@ Slowed & Reverb Studio — backend server
 Runs on port 7337. Provides SSE-based download streaming and file serving.
 """
 
+import base64
 import json
 import os
 import queue
 import re
+import secrets
 import threading
 import time
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 from backend_utils import clean_error_message
@@ -57,6 +61,98 @@ threading.Thread(target=_cleanup_loop, daemon=True).start()
 
 def _sse(event_type, data):
     return f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
+
+
+def _save_env_key(key, value):
+    """Add, update, or remove a key in the .env file."""
+    env_path = STUDIO_DIR / ".env"
+    lines = env_path.read_text().splitlines() if env_path.exists() else []
+    found = False
+    new_lines = []
+    for line in lines:
+        if line.strip().startswith(f"{key}="):
+            if value is not None:
+                new_lines.append(f"{key}={value}")
+            found = True
+        else:
+            new_lines.append(line)
+    if not found and value is not None:
+        new_lines.append(f"{key}={value}")
+    env_path.write_text("\n".join(new_lines) + ("\n" if new_lines else ""))
+
+
+_oauth_state = None
+
+
+@app.route("/spotify/auth")
+def spotify_auth():
+    global _oauth_state
+    client_id = os.environ.get("SPOTIFY_CLIENT_ID", "")
+    if not client_id:
+        return jsonify({"error": "SPOTIFY_CLIENT_ID not set in .env"}), 400
+    port = int(os.environ.get("PORT", 7337))
+    redirect_uri = f"http://localhost:{port}/spotify/callback"
+    _oauth_state = secrets.token_hex(16)
+    params = urllib.parse.urlencode({
+        "client_id": client_id,
+        "response_type": "code",
+        "redirect_uri": redirect_uri,
+        "scope": "playlist-read-private playlist-read-collaborative",
+        "state": _oauth_state,
+    })
+    return jsonify({"url": f"https://accounts.spotify.com/authorize?{params}"})
+
+
+@app.route("/spotify/callback")
+def spotify_callback():
+    global _oauth_state
+    error = request.args.get("error")
+    if error:
+        return f"<html><body><p>Auth failed: {error}</p><script>window.close();</script></body></html>"
+    if request.args.get("state") != _oauth_state:
+        return "Invalid state", 400
+    code = request.args.get("code", "")
+    client_id = os.environ.get("SPOTIFY_CLIENT_ID", "")
+    client_secret = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
+    port = int(os.environ.get("PORT", 7337))
+    redirect_uri = f"http://localhost:{port}/spotify/callback"
+    creds = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+    data = urllib.parse.urlencode({
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": redirect_uri,
+    }).encode()
+    req = urllib.request.Request(
+        "https://accounts.spotify.com/api/token",
+        data=data,
+        headers={"Authorization": f"Basic {creds}"},
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            result = json.loads(resp.read())
+    except Exception as e:
+        return f"<html><body><p>Token exchange failed: {e}</p></body></html>", 500
+    refresh_token = result.get("refresh_token", "")
+    if refresh_token:
+        _save_env_key("SPOTIFY_REFRESH_TOKEN", refresh_token)
+        os.environ["SPOTIFY_REFRESH_TOKEN"] = refresh_token
+    return """<html><head><title>Spotify Connected</title></head><body>
+<p style="font-family:sans-serif;padding:20px">Spotify connected! You can close this window.</p>
+<script>window.close();</script>
+</body></html>"""
+
+
+@app.route("/spotify/status")
+def spotify_status():
+    connected = bool(os.environ.get("SPOTIFY_REFRESH_TOKEN", ""))
+    return jsonify({"connected": connected})
+
+
+@app.route("/spotify/disconnect", methods=["POST"])
+def spotify_disconnect():
+    _save_env_key("SPOTIFY_REFRESH_TOKEN", None)
+    os.environ.pop("SPOTIFY_REFRESH_TOKEN", None)
+    return jsonify({"ok": True})
 
 
 _ytmusic = None
@@ -126,7 +222,14 @@ def playlist_info():
             _spotify_token,
         )
         if "spotify.com" in url:
-            token = _spotify_token()
+            from studio_downloader import has_spotify_oauth, _spotify_user_token
+            is_playlist = bool(re.search(r'spotify\.com/playlist/', url))
+            if is_playlist:
+                if not has_spotify_oauth():
+                    return jsonify({"error": "spotify_auth_required"}), 403
+                token = _spotify_user_token()
+            else:
+                token = _spotify_token()
             tracks, meta = _get_spotify_tracks(url, token)
             return jsonify({
                 "name": meta.get("name", ""),

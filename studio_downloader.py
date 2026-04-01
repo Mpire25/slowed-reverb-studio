@@ -66,13 +66,49 @@ def _spotify_token():
         return json.loads(resp.read())["access_token"]
 
 
+def has_spotify_oauth():
+    """Returns True if a Spotify refresh token is stored."""
+    return bool(os.environ.get("SPOTIFY_REFRESH_TOKEN", ""))
+
+
+def _spotify_user_token():
+    """Get a user-scoped access token using the stored refresh token."""
+    import urllib.error
+    refresh_token = os.environ.get("SPOTIFY_REFRESH_TOKEN", "")
+    if not refresh_token:
+        raise RuntimeError("spotify_auth_required")
+    client_id = os.environ.get("SPOTIFY_CLIENT_ID", "")
+    client_secret = os.environ.get("SPOTIFY_CLIENT_SECRET", "")
+    creds = base64.b64encode(f"{client_id}:{client_secret}".encode()).decode()
+    data = urllib.parse.urlencode({
+        "grant_type": "refresh_token",
+        "refresh_token": refresh_token,
+    }).encode()
+    req = urllib.request.Request(
+        "https://accounts.spotify.com/api/token",
+        data=data,
+        headers={"Authorization": f"Basic {creds}"},
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return json.loads(resp.read())["access_token"]
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Failed to refresh Spotify token: {body}") from None
+
+
 def _spotify_get(path, token):
+    import urllib.error
     req = urllib.request.Request(
         f"https://api.spotify.com/v1{path}",
         headers={"Authorization": f"Bearer {token}"},
     )
-    with urllib.request.urlopen(req) as resp:
-        return json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Spotify API {e.code}: {body}") from None
 
 
 def _get_spotify_tracks(url, token):
@@ -116,17 +152,16 @@ def _get_spotify_tracks(url, token):
         return tracks, {"name": album_name, "artist": artist, "type": "album",
                         "image_url": image_url}
 
-    else:  # playlist
-        data = _spotify_get(f"/playlists/{sid}?fields=name,tracks.total", token)
-        total = data["tracks"]["total"]
+    else:  # playlist — requires user OAuth token
+        meta = _spotify_get(f"/playlists/{sid}", token)
+        playlist_images = meta.get("images", [])
         tracks = []
         offset = 0
-        while offset < total:
-            page = _spotify_get(
-                f"/playlists/{sid}/tracks"
-                f"?fields=items(track(name,duration_ms,artists,album(name,images)))&limit=50&offset={offset}",
-                token,
-            )
+        total = None
+        while total is None or offset < total:
+            page = _spotify_get(f"/playlists/{sid}/tracks?limit=50&offset={offset}", token)
+            if total is None:
+                total = page["total"]
             for item in page["items"]:
                 t = item.get("track")
                 if t and t.get("name"):
@@ -139,9 +174,10 @@ def _get_spotify_tracks(url, token):
                         "image_url": images[0]["url"] if images else None,
                     })
             offset += 50
-        first_image = tracks[0]["image_url"] if tracks else None
-        return tracks, {"name": data["name"], "type": "playlist",
-                        "image_url": first_image}
+        playlist_image = playlist_images[0]["url"] if playlist_images else (
+            tracks[0]["image_url"] if tracks else None
+        )
+        return tracks, {"name": meta["name"], "type": "playlist", "image_url": playlist_image}
 
 
 # ── YouTube Music search ───────────────────────────────────────────────────────
@@ -480,7 +516,8 @@ def download_spotify(url, on_event):
     on_event("stage", {"stage": "fetching_metadata",
                         "message": "Fetching Spotify metadata…"})
 
-    token = _spotify_token()
+    is_playlist = bool(re.search(r'spotify\.com/playlist/', url))
+    token = _spotify_user_token() if is_playlist else _spotify_token()
     tracks, meta = _get_spotify_tracks(url, token)
 
     on_event("metadata", {
