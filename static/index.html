@@ -213,17 +213,24 @@
       <div class="playlist-panel-name" id="playlistSidebarName"></div>
       <div class="playlist-panel-count" id="playlistSidebarCount"></div>
     </div>
-    <button class="transport-icon-btn loop-btn playlist-loop-btn" id="playlistLoopBtn" title="Loop Playlist Off" aria-label="Toggle Playlist Loop" aria-pressed="false">
-      <svg viewBox="0 0 24 24" fill="none" stroke="url(#playlistLoopGrad)" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
-        <defs>
-          <linearGradient id="playlistLoopGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" class="loop-grad-stop1"/>
-            <stop offset="100%" class="loop-grad-stop2"/>
-          </linearGradient>
-        </defs>
-        <path d="M8 7h9l-2.5-2.5M16 17H7l2.5 2.5M17 7c2 0 3 1 3 3v1M7 17c-2 0-3-1-3-3v-1"/>
-      </svg>
-    </button>
+    <div class="playlist-panel-actions">
+      <a class="track-source-link hidden" id="playlistSidebarLink" href="#" target="_blank" rel="noopener noreferrer" title="Open on Spotify" aria-label="Open on Spotify">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 1.5A10.5 10.5 0 1 0 22.5 12 10.5 10.5 0 0 0 12 1.5Zm4.85 15.15a.9.9 0 0 1-1.24.3 9.55 9.55 0 0 0-7.97-.98.9.9 0 1 1-.56-1.71 11.34 11.34 0 0 1 9.47 1.17.9.9 0 0 1 .3 1.22Zm1.28-2.83a1.12 1.12 0 0 1-1.54.37 11.84 11.84 0 0 0-9.87-1.22 1.12 1.12 0 1 1-.67-2.14 14.07 14.07 0 0 1 11.72 1.45 1.12 1.12 0 0 1 .36 1.54Zm.15-3.04A14.2 14.2 0 0 0 6.41 9.25a1.35 1.35 0 0 1-.8-2.58 16.89 16.89 0 0 1 14.11 1.79 1.35 1.35 0 1 1-1.44 2.32Z"/>
+        </svg>
+      </a>
+      <button class="transport-icon-btn loop-btn playlist-loop-btn" id="playlistLoopBtn" title="Loop Playlist Off" aria-label="Toggle Playlist Loop" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="url(#playlistLoopGrad)" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <defs>
+            <linearGradient id="playlistLoopGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" class="loop-grad-stop1"/>
+              <stop offset="100%" class="loop-grad-stop2"/>
+            </linearGradient>
+          </defs>
+          <path d="M8 7h9l-2.5-2.5M16 17H7l2.5 2.5M17 7c2 0 3 1 3 3v1M7 17c-2 0-3-1-3-3v-1"/>
+        </svg>
+      </button>
+    </div>
   </div>
   <div class="playlist-track-list" id="playlistTrackList"></div>
 </div>

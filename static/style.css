@@ -86,13 +86,13 @@ body.playlist-open .playlist-panel{
   pointer-events:auto;
 }
 .playlist-panel-header{
-  display:flex;align-items:flex-start;justify-content:space-between;
+  display:flex;align-items:center;justify-content:space-between;
   padding:16px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0;
 }
-.playlist-panel-meta{min-width:0;flex:1}
+.playlist-panel-meta{min-width:0;flex:1;align-self:flex-start}
 .playlist-panel-name{font-size:.88rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .playlist-panel-count{font-size:.73rem;color:var(--muted);margin-top:2px}
-
+.playlist-panel-actions{display:flex;align-items:center;gap:8px}
 /* ── Header ── */
 header{display:flex;align-items:center;justify-content:space-between;max-width:1400px;margin:0 auto 32px;padding:20px 40px;width:100%}
 .logo{font-size:1.2rem;font-weight:700;letter-spacing:-0.02em;display:flex;align-items:center;gap:10px;

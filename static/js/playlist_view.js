@@ -169,15 +169,31 @@ export function createPlaylistView({ onJumpToTrack, onToggleLoop }) {
     }
   }
 
-  function openPanel(name, count, loopEnabled) {
+  function openPanel(name, count, loopEnabled, sourceUrl = null) {
     const nameEl = $id('playlistSidebarName');
     const countEl = $id('playlistSidebarCount');
     const mobileNameEl = $id('playlistMobileOverlayName');
     const loopBtn = $id('playlistLoopBtn');
+    const sourceLinkEl = $id('playlistSidebarLink');
     const countStr = `${count} track${count !== 1 ? 's' : ''}`;
     if (nameEl) nameEl.textContent = name;
     if (countEl) countEl.textContent = countStr;
     if (mobileNameEl) mobileNameEl.textContent = name;
+    if (sourceLinkEl) {
+      const isSpotify = !!sourceUrl && /spotify\.com/i.test(sourceUrl);
+      const isYouTubeMusic = !!sourceUrl && /music\.youtube\.com/i.test(sourceUrl);
+      if (sourceUrl) {
+        sourceLinkEl.href = sourceUrl;
+        sourceLinkEl.title = isSpotify ? 'Open on Spotify' : (isYouTubeMusic ? 'Open on YouTube Music' : 'Open source');
+        sourceLinkEl.setAttribute('aria-label', sourceLinkEl.title);
+        sourceLinkEl.classList.remove('hidden');
+      } else {
+        sourceLinkEl.href = '#';
+        sourceLinkEl.title = 'Open source';
+        sourceLinkEl.setAttribute('aria-label', 'Open source');
+        sourceLinkEl.classList.add('hidden');
+      }
+    }
     if (loopBtn) loopBtn.onclick = onToggleLoop;
     document.body.classList.add('playlist-open');
 
@@ -201,7 +217,12 @@ export function createPlaylistView({ onJumpToTrack, onToggleLoop }) {
     stopPanelHeightSync();
     document.body.classList.remove('playlist-open');
     const loopBtn = $id('playlistLoopBtn');
+    const sourceLinkEl = $id('playlistSidebarLink');
     if (loopBtn) loopBtn.onclick = null;
+    if (sourceLinkEl) {
+      sourceLinkEl.href = '#';
+      sourceLinkEl.classList.add('hidden');
+    }
     const list = $id('playlistTrackList');
     if (list) list.innerHTML = '';
     const mobileList = $id('playlistMobileTrackList');

@@ -158,6 +158,7 @@ async function startPlaylistLoad(url) {
   const setImportStage = text => stageText.set(text);
 
   let firstStream = null;
+  let firstTrackYouTubeUrl = null;
 
   try {
     const res = await fetch(`${SERVER}/api/playlist/info?url=${encodeURIComponent(url)}`);
@@ -185,13 +186,20 @@ async function startPlaylistLoad(url) {
 
     const firstTrack = data.tracks[0];
     const isSpotifySource = /spotify\.com/i.test(url);
+    const isPlaylistContainer = /playlist/i.test(data.type || '');
 
     // In playlist/album mode, title should represent the container, not track 1.
     progressBar.completeStage('resolve');
     setText(titleEl, data.name || firstTrack.name || 'Playlist');
-    setText(artistEl, firstTrack.artist || '');
-    if (firstTrack.image_url) {
-      artEl.innerHTML = `<img src="${firstTrack.image_url}" alt="album art">`;
+    setText(
+      artistEl,
+      isPlaylistContainer
+        ? `${data.tracks.length} tracks`
+        : (firstTrack.artist || '')
+    );
+    if (data.image_url || firstTrack.image_url) {
+      const artUrl = data.image_url || firstTrack.image_url;
+      artEl.innerHTML = `<img src="${artUrl}" alt="playlist art">`;
     }
 
     const trackData = {
@@ -202,6 +210,8 @@ async function startPlaylistLoad(url) {
       duration_ms: firstTrack.duration_ms || 0,
       image_url: firstTrack.image_url || null,
       video_id: firstTrack.video_id || null,
+      spotify_url: firstTrack.spotify_url || null,
+      youtube_url: firstTrack.youtube_url || null,
     };
 
     firstStream = openImportStream({
@@ -219,6 +229,7 @@ async function startPlaylistLoad(url) {
         },
         found: (d) => {
           setImportStage(d.fallback ? 'No exact match — searching YouTube…' : 'Found on YouTube Music');
+          firstTrackYouTubeUrl = d.youtube_url || firstTrackYouTubeUrl;
           progressBar.advanceToStage('download');
         },
         progress: (d) => {
@@ -252,9 +263,13 @@ async function startPlaylistLoad(url) {
             for (const chunk of chunks) { ab.set(chunk, pos); pos += chunk.byteLength; }
 
             const sourceLinks = {
-              spotify: isSpotifySource ? url : null,
+              spotify: isSpotifySource ? (firstTrack.spotify_url || url) : null,
               youtube: isSpotifySource
-                ? (firstTrack.video_id ? `https://www.youtube.com/watch?v=${firstTrack.video_id}` : null)
+                ? (
+                  firstTrackYouTubeUrl
+                    || firstTrack.youtube_url
+                    || (firstTrack.video_id ? `https://www.youtube.com/watch?v=${firstTrack.video_id}` : null)
+                )
                 : url,
             };
             await loadFile(ab.buffer, (firstTrack.name || 'track') + '.mp3', {
@@ -274,6 +289,9 @@ async function startPlaylistLoad(url) {
           urlInput.value = '';
 
           const { initPlaylist } = await import('./playlist.js');
+          if (firstTrackYouTubeUrl && data.tracks?.[0]) {
+            data.tracks[0].youtube_url = firstTrackYouTubeUrl;
+          }
           initPlaylist(data, url, { firstTrackPath: d.file });
         },
       },

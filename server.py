@@ -250,6 +250,8 @@ def playlist_info():
                         "album": t.get("album", ""),
                         "duration_ms": t.get("duration_ms", 0),
                         "image_url": t.get("image_url"),
+                        "spotify_url": t.get("spotify_url"),
+                        "video_id": t.get("video_id"),
                     }
                     for i, t in enumerate(tracks)
                 ],

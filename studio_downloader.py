@@ -138,12 +138,21 @@ def _spotify_track_payload_to_dict(track_payload):
         artists = []
     first_artist = artists[0] if artists and isinstance(artists[0], dict) else {}
     artist_name = first_artist.get("name") or "Unknown"
+    ext = track_payload.get("external_urls")
+    if not isinstance(ext, dict):
+        ext = {}
+    spotify_url = ext.get("spotify")
+    if not spotify_url:
+        track_id = track_payload.get("id")
+        if track_id:
+            spotify_url = f"https://open.spotify.com/track/{track_id}"
     return {
         "name": track_payload["name"],
         "artist": artist_name,
         "album": album_obj.get("name", ""),
         "duration_ms": track_payload.get("duration_ms", 0),
         "image_url": images[0]["url"] if images else None,
+        "spotify_url": spotify_url,
     }
 
 
@@ -331,12 +340,14 @@ def _get_spotify_tracks(url, token):
         artist = data["artists"][0]["name"]
         album = data.get("album", {}).get("name", "")
         images = data.get("album", {}).get("images", [])
+        ext = data.get("external_urls", {})
         track = {
             "name": data["name"],
             "artist": artist,
             "album": album,
             "duration_ms": data["duration_ms"],
             "image_url": images[0]["url"] if images else None,
+            "spotify_url": ext.get("spotify") or f"https://open.spotify.com/track/{sid}",
         }
         return [track], {"name": data["name"], "artist": artist, "type": "track",
                          "image_url": track["image_url"]}
@@ -354,6 +365,14 @@ def _get_spotify_tracks(url, token):
                 "album": album_name,
                 "duration_ms": t["duration_ms"],
                 "image_url": image_url,
+                "spotify_url": (
+                    (t.get("external_urls") or {}).get("spotify")
+                    or (
+                        f"https://open.spotify.com/track/{t.get('id')}"
+                        if t.get("id")
+                        else None
+                    )
+                ),
             }
             for t in data["tracks"]["items"]
         ]
