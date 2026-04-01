@@ -34,6 +34,9 @@ SPOTIFY_CLIENT_ID=your_client_id
 SPOTIFY_CLIENT_SECRET=your_client_secret
 ```
 
+For Spotify playlist imports, open **Settings** in the app and click **Connect Spotify**.  
+Before connecting, add the callback URL shown in Settings (for example `http://127.0.0.1:7337/spotify/callback`) to your Spotify app's Redirect URIs.
+
 ### 4. Run the server
 
 ```bash
@@ -86,6 +89,7 @@ slowed-reverb-studio/
       waveform.js       — waveform rendering
       loader.js         — file loading, track UI
       importer.js       — SSE import flow
+      spotify_auth.js   — Spotify OAuth connect/disconnect status UI
       exporter.js       — MP3 export
       settings.js       — settings persistence
       controls.js       — shared slider/loop UI sync helpers
