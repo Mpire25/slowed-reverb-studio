@@ -25,6 +25,7 @@ import { handleFileObject, resetStudio, updateSourceImportUI } from './loader.js
 import { initImporter } from './importer.js';
 import { doExport, closeModal } from './exporter.js';
 import { loadSettings, saveSettings, syncSettingsUI } from './settings.js';
+import { initSpotifyAuth } from './spotify_auth.js';
 import { applyThemeFromCurrentTrack } from './theme.js';
 import { $id, setText, toggleClass } from './dom.js';
 import {
@@ -44,6 +45,7 @@ import { initMediaSession } from './mediasession.js';
 // ─── Init ────────────────────────────────────────────────────────────────────
 loadSettings();
 syncSettingsUI();
+initSpotifyAuth();
 initImporter();
 initMediaSession({
   play: () => { if (state.audioBuffer) play(); },
@@ -273,6 +275,7 @@ $id('modalConfirm').addEventListener('click', async () => {
 $id('gearBtn').addEventListener('click', () => {
   toggleClass($id('settingsPanel'), 'open', true);
   toggleClass($id('overlay'), 'open', true);
+  import('./spotify_auth.js').then(m => m.refreshSpotifyStatus());
 });
 function closeSettings() {
   toggleClass($id('settingsPanel'), 'open', false);
