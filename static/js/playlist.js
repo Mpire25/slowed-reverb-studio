@@ -197,6 +197,7 @@ async function _loadAndPlayTrack(index) {
     });
   } catch (err) {
     console.error('Failed to load playlist track:', err);
+    toast(`Error loading "${track.name}": ${err.message}`, 5000, 'error');
   }
 }
 
