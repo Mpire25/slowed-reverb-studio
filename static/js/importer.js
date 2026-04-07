@@ -9,6 +9,20 @@ import { initImporterSearch } from './importer_search.js';
 import { createImporterView } from './importer_view.js';
 import { openImportStream } from './importer_stream.js';
 
+function friendlyDownloadError(msg) {
+  if (!msg) return 'Download failed';
+  if (/sign in to confirm you.re not a bot/i.test(msg)) {
+    return 'YouTube is blocking the download. Try again later or use a different source.';
+  }
+  if (/sign in/i.test(msg) && /youtube/i.test(msg)) {
+    return 'YouTube requires sign-in to download this track.';
+  }
+  if (/private video/i.test(msg)) return 'This video is private and cannot be downloaded.';
+  if (/video unavailable/i.test(msg)) return 'This video is unavailable.';
+  if (/copyright/i.test(msg)) return 'This video is unavailable due to a copyright claim.';
+  return msg;
+}
+
 export function initImporter() {
   const btn = $id('urlLoadBtn');
   const urlInput = $id('urlInput');
@@ -297,7 +311,7 @@ async function startPlaylistLoad(url) {
       },
       onServerError: (msg) => {
         firstStream = null;
-        const message = msg || 'Download failed';
+        const message = friendlyDownloadError(msg);
         toast('Error: ' + message, 5000, 'error');
         view.restoreInputs();
         view.hideStatus();
@@ -569,7 +583,7 @@ function startDownload(url, prefill = null) {
       },
     },
     onServerError: (msg) => {
-      const message = msg || 'Download failed';
+      const message = friendlyDownloadError(msg);
       toast('Error: ' + message, 5000, 'error');
       setImportUiState(IMPORT_UI_STATE.ERROR);
     },
