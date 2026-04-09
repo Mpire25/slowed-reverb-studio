@@ -129,6 +129,7 @@ export function jumpToTrack(index) {
       toast(`Loading "${track.name}"…`, 3000, 'info');
     }
     _setCurrentTrack(targetIndex);
+    ps.pendingPlayIndex = targetIndex;
     _prioritizeAndDownload(targetIndex);
   }
 }
