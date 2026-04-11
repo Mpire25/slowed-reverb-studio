@@ -323,6 +323,8 @@ def _spotify_get_playlist_tracks(sid, token):
 
 def _get_spotify_tracks(url, token):
     """Returns (tracks_list, meta_dict)."""
+    if re.search(r'spotify\.com/artist/', url):
+        raise ValueError("Artist pages aren't supported.")
     m = re.search(r'spotify\.com/(track|album|playlist)/([A-Za-z0-9]+)', url)
     if not m:
         raise ValueError("Invalid Spotify URL")
