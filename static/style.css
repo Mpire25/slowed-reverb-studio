@@ -681,6 +681,14 @@ body.playlist-open .playlist-mobile-bar{transform:translateY(0)}
   .playlist-panel{display:none!important}
 }
 
+/* ── Visualizer Fullscreen Transition Overlay ── */
+#vizFsTransitionOverlay{
+  position:fixed;inset:0;background:var(--bg);
+  z-index:500;opacity:0;pointer-events:none;
+  transition:opacity .22s ease;
+}
+#vizFsTransitionOverlay.visible{opacity:1;pointer-events:auto}
+
 /* ── Visualizer Fullscreen Toggle Button ── */
 .viz-fs-toggle-btn{opacity:.6}
 .viz-fs-toggle-btn:hover{opacity:1}

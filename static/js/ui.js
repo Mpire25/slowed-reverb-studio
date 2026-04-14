@@ -428,16 +428,29 @@ function syncVizFullscreenBar() {
   updateTimeDisplay();
 }
 
+function vizFsTransition(callback) {
+  const overlay = $id('vizFsTransitionOverlay');
+  overlay.classList.add('visible');
+  setTimeout(() => {
+    callback();
+    requestAnimationFrame(() => requestAnimationFrame(() => overlay.classList.remove('visible')));
+  }, 220);
+}
+
 function enterVizFullscreen() {
-  document.body.classList.add('viz-fullscreen');
-  syncVizFullscreenBar();
-  if (!state.animFrame) startAnimLoop();
+  vizFsTransition(() => {
+    document.body.classList.add('viz-fullscreen');
+    syncVizFullscreenBar();
+    if (!state.animFrame) startAnimLoop();
+  });
 }
 
 function exitVizFullscreen() {
-  document.body.classList.remove('viz-fullscreen');
-  stopAnimLoopIfIdle();
-  drawBottomVisualizer(!state.playing);
+  vizFsTransition(() => {
+    document.body.classList.remove('viz-fullscreen');
+    stopAnimLoopIfIdle();
+    drawBottomVisualizer(!state.playing);
+  });
 }
 
 function toggleVizFullscreen() {
