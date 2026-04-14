@@ -6,28 +6,38 @@ import { $id, setText } from './dom.js';
 export const VISUALIZER_FADE_OUT_MS = 420;
 export const VISUALIZER_FADE_CURVE = 1.45;
 
+// ─── Fullscreen smoothed energy state ────────────────────────────────────────
+// Separate heavily-smoothed values for fullscreen so blooms feel gradual at large scale.
+let fsBass = 0, fsHigh = 0, fsPulse = 0, fsIntensity = 0.35;
+const FS_SMOOTH = 0.94; // higher = slower / more gradual
+
 // ─── Fullscreen Visualizer Draw ───────────────────────────────────────────────
-// Same dreamy wave style as the normal bottom visualizer, scaled to fill the screen.
 function drawFullscreenVisualizer(ctx2d, W, H, bass, lowMid, high, loudness,
   hueA, hueB, hueC, animPhase, pointCount, now, intensity, pulse) {
 
-  // Background – same gradient blooms, scaled up
+  // Smooth the reactive values so they ease rather than jump at full-screen scale
+  fsBass      = fsBass      * FS_SMOOTH + bass      * (1 - FS_SMOOTH);
+  fsHigh      = fsHigh      * FS_SMOOTH + high      * (1 - FS_SMOOTH);
+  fsPulse     = fsPulse     * FS_SMOOTH + pulse     * (1 - FS_SMOOTH);
+  fsIntensity = fsIntensity * FS_SMOOTH + intensity * (1 - FS_SMOOTH);
+
+  // Background – same gradient blooms, scaled up, using smoothed values
   const gradShift = (Math.sin(now * 0.11) * 0.5 + 0.5) * W * 0.17;
   const haze = ctx2d.createLinearGradient(gradShift, H, W - gradShift, 0);
-  haze.addColorStop(0,     `hsla(${hueA.toFixed(1)},88%,57%,${(0.08 + pulse * 0.16) * intensity})`);
-  haze.addColorStop(0.225, `hsla(${hueC.toFixed(1)},86%,64%,${(0.06 + pulse * 0.10) * intensity})`);
+  haze.addColorStop(0,     `hsla(${hueA.toFixed(1)},88%,57%,${(0.08 + fsPulse * 0.16) * fsIntensity})`);
+  haze.addColorStop(0.225, `hsla(${hueC.toFixed(1)},86%,64%,${(0.06 + fsPulse * 0.10) * fsIntensity})`);
   haze.addColorStop(1,     `hsla(${hueB.toFixed(1)},92%,56%,0)`);
   ctx2d.fillStyle = haze;
   ctx2d.fillRect(0, 0, W, H);
 
   const bloomLeft = ctx2d.createRadialGradient(W * 0.18, H, 0, W * 0.18, H, W * 0.55);
-  bloomLeft.addColorStop(0, `hsla(${hueA.toFixed(1)},90%,60%,${(0.12 + bass * 0.28) * intensity})`);
+  bloomLeft.addColorStop(0, `hsla(${hueA.toFixed(1)},90%,60%,${(0.12 + fsBass * 0.28) * fsIntensity})`);
   bloomLeft.addColorStop(1, `hsla(${hueA.toFixed(1)},90%,60%,0)`);
   ctx2d.fillStyle = bloomLeft;
   ctx2d.fillRect(0, 0, W, H);
 
   const bloomRight = ctx2d.createRadialGradient(W * 0.84, H, 0, W * 0.84, H, W * 0.52);
-  bloomRight.addColorStop(0, `hsla(${hueB.toFixed(1)},94%,55%,${(0.12 + high * 0.22) * intensity})`);
+  bloomRight.addColorStop(0, `hsla(${hueB.toFixed(1)},94%,55%,${(0.12 + fsHigh * 0.22) * fsIntensity})`);
   bloomRight.addColorStop(1, `hsla(${hueB.toFixed(1)},94%,55%,0)`);
   ctx2d.fillStyle = bloomRight;
   ctx2d.fillRect(0, 0, W, H);
