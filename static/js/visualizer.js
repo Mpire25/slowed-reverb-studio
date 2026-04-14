@@ -32,54 +32,6 @@ function drawFullscreenVisualizer(ctx2d, W, H, bass, lowMid, high, loudness,
   ctx2d.fillStyle = bloomRight;
   ctx2d.fillRect(0, 0, W, H);
 
-  // Wave helper — same logic as normal mode, but amplitude and drift scale with H
-  const waveH  = H * 0.78;
-  const driftBase = H * 0.022;
-  const driftBass = H * 0.060;
-  const driftMid  = H * 0.030;
-
-  function drawFsWave(yBase, ampScale, colorA, colorB, alpha, lineW, speed, freq) {
-    const xShift = (Math.sin(now * (0.06 + speed * 0.02)) * 0.5 + 0.5) * W * 0.28;
-    const grad = ctx2d.createLinearGradient(xShift, H, W - xShift * 0.35, 0);
-    grad.addColorStop(0, colorA);
-    grad.addColorStop(1, colorB);
-    ctx2d.strokeStyle = grad;
-    ctx2d.lineWidth = lineW;
-    ctx2d.lineCap = 'round';
-    ctx2d.lineJoin = 'round';
-    ctx2d.globalAlpha = alpha;
-    ctx2d.beginPath();
-    let firstY = yBase;
-    for (let i = 0; i < pointCount; i++) {
-      const t = i / (pointCount - 1);
-      const x = t * W;
-      const amp  = Math.pow(state.visualizerBarData[i], 1.2) * (waveH * ampScale);
-      const drift = Math.sin(animPhase * speed + t * freq) * (driftBase + bass * driftBass + lowMid * driftMid);
-      const y = yBase - amp - drift;
-      if (i === 0) {
-        firstY = y;
-        ctx2d.moveTo(x, y);
-      } else {
-        const pt = (i - 1) / (pointCount - 1);
-        const px = pt * W;
-        const pa = Math.pow(state.visualizerBarData[i - 1], 1.2) * (waveH * ampScale);
-        const pd = Math.sin(animPhase * speed + pt * freq) * (driftBase + bass * driftBass + lowMid * driftMid);
-        const py = yBase - pa - pd;
-        ctx2d.quadraticCurveTo(px, py, (px + x) * 0.5, (py + y) * 0.5);
-      }
-    }
-    ctx2d.lineTo(W, firstY);
-    ctx2d.stroke();
-  }
-
-  // Three wave layers — same character as normal mode, bigger
-  ctx2d.shadowBlur = 28;
-  ctx2d.shadowColor = 'rgba(124,58,237,0.22)';
-  drawFsWave(H - H * 0.04, 0.36, `hsla(${hueA.toFixed(1)},90%,60%,0.62)`, `hsla(${hueB.toFixed(1)},92%,56%,0.54)`, 0.34 + loudness * 0.9, 22, 1.2, 8.8);
-  drawFsWave(H - H * 0.07, 0.32, `hsla(${hueC.toFixed(1)},88%,68%,0.52)`, `hsla(${hueB.toFixed(1)},94%,62%,0.48)`, 0.28 + loudness * 0.7, 16, 1.55, 10.2);
-  ctx2d.shadowBlur = 0;
-  drawFsWave(H - H * 0.11, 0.26, `hsla(${hueA.toFixed(1)},76%,80%,0.42)`, `hsla(${hueB.toFixed(1)},86%,76%,0.36)`, 0.24 + loudness * 0.5, 11, 1.8, 11.4);
-
   // Canvas-side fade mask (top transparent → bottom visible), mimicking the CSS mask removed in fullscreen
   ctx2d.globalAlpha = 1;
   const mask = ctx2d.createLinearGradient(0, 0, 0, H);
