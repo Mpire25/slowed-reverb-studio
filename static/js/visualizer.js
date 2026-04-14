@@ -6,6 +6,91 @@ import { $id, setText } from './dom.js';
 export const VISUALIZER_FADE_OUT_MS = 420;
 export const VISUALIZER_FADE_CURVE = 1.45;
 
+// ─── Fullscreen Visualizer Draw ───────────────────────────────────────────────
+// Same dreamy wave style as the normal bottom visualizer, scaled to fill the screen.
+function drawFullscreenVisualizer(ctx2d, W, H, bass, lowMid, high, loudness,
+  hueA, hueB, hueC, animPhase, pointCount, now, intensity, pulse) {
+
+  // Background – same gradient blooms, scaled up
+  const gradShift = (Math.sin(now * 0.11) * 0.5 + 0.5) * W * 0.17;
+  const haze = ctx2d.createLinearGradient(gradShift, H, W - gradShift, 0);
+  haze.addColorStop(0,     `hsla(${hueA.toFixed(1)},88%,57%,${(0.08 + pulse * 0.16) * intensity})`);
+  haze.addColorStop(0.225, `hsla(${hueC.toFixed(1)},86%,64%,${(0.06 + pulse * 0.10) * intensity})`);
+  haze.addColorStop(1,     `hsla(${hueB.toFixed(1)},92%,56%,0)`);
+  ctx2d.fillStyle = haze;
+  ctx2d.fillRect(0, 0, W, H);
+
+  const bloomLeft = ctx2d.createRadialGradient(W * 0.18, H, 0, W * 0.18, H, W * 0.55);
+  bloomLeft.addColorStop(0, `hsla(${hueA.toFixed(1)},90%,60%,${(0.12 + bass * 0.28) * intensity})`);
+  bloomLeft.addColorStop(1, `hsla(${hueA.toFixed(1)},90%,60%,0)`);
+  ctx2d.fillStyle = bloomLeft;
+  ctx2d.fillRect(0, 0, W, H);
+
+  const bloomRight = ctx2d.createRadialGradient(W * 0.84, H, 0, W * 0.84, H, W * 0.52);
+  bloomRight.addColorStop(0, `hsla(${hueB.toFixed(1)},94%,55%,${(0.12 + high * 0.22) * intensity})`);
+  bloomRight.addColorStop(1, `hsla(${hueB.toFixed(1)},94%,55%,0)`);
+  ctx2d.fillStyle = bloomRight;
+  ctx2d.fillRect(0, 0, W, H);
+
+  // Wave helper — same logic as normal mode, but amplitude and drift scale with H
+  const waveH  = H * 0.78;
+  const driftBase = H * 0.022;
+  const driftBass = H * 0.060;
+  const driftMid  = H * 0.030;
+
+  function drawFsWave(yBase, ampScale, colorA, colorB, alpha, lineW, speed, freq) {
+    const xShift = (Math.sin(now * (0.06 + speed * 0.02)) * 0.5 + 0.5) * W * 0.28;
+    const grad = ctx2d.createLinearGradient(xShift, H, W - xShift * 0.35, 0);
+    grad.addColorStop(0, colorA);
+    grad.addColorStop(1, colorB);
+    ctx2d.strokeStyle = grad;
+    ctx2d.lineWidth = lineW;
+    ctx2d.lineCap = 'round';
+    ctx2d.lineJoin = 'round';
+    ctx2d.globalAlpha = alpha;
+    ctx2d.beginPath();
+    let firstY = yBase;
+    for (let i = 0; i < pointCount; i++) {
+      const t = i / (pointCount - 1);
+      const x = t * W;
+      const amp  = Math.pow(state.visualizerBarData[i], 1.2) * (waveH * ampScale);
+      const drift = Math.sin(animPhase * speed + t * freq) * (driftBase + bass * driftBass + lowMid * driftMid);
+      const y = yBase - amp - drift;
+      if (i === 0) {
+        firstY = y;
+        ctx2d.moveTo(x, y);
+      } else {
+        const pt = (i - 1) / (pointCount - 1);
+        const px = pt * W;
+        const pa = Math.pow(state.visualizerBarData[i - 1], 1.2) * (waveH * ampScale);
+        const pd = Math.sin(animPhase * speed + pt * freq) * (driftBase + bass * driftBass + lowMid * driftMid);
+        const py = yBase - pa - pd;
+        ctx2d.quadraticCurveTo(px, py, (px + x) * 0.5, (py + y) * 0.5);
+      }
+    }
+    ctx2d.lineTo(W, firstY);
+    ctx2d.stroke();
+  }
+
+  // Three wave layers — same character as normal mode, bigger
+  ctx2d.shadowBlur = 28;
+  ctx2d.shadowColor = 'rgba(124,58,237,0.22)';
+  drawFsWave(H - H * 0.04, 0.36, `hsla(${hueA.toFixed(1)},90%,60%,0.62)`, `hsla(${hueB.toFixed(1)},92%,56%,0.54)`, 0.34 + loudness * 0.9, 22, 1.2, 8.8);
+  drawFsWave(H - H * 0.07, 0.32, `hsla(${hueC.toFixed(1)},88%,68%,0.52)`, `hsla(${hueB.toFixed(1)},94%,62%,0.48)`, 0.28 + loudness * 0.7, 16, 1.55, 10.2);
+  ctx2d.shadowBlur = 0;
+  drawFsWave(H - H * 0.11, 0.26, `hsla(${hueA.toFixed(1)},76%,80%,0.42)`, `hsla(${hueB.toFixed(1)},86%,76%,0.36)`, 0.24 + loudness * 0.5, 11, 1.8, 11.4);
+
+  // Canvas-side fade mask (top transparent → bottom visible), mimicking the CSS mask removed in fullscreen
+  ctx2d.globalAlpha = 1;
+  const mask = ctx2d.createLinearGradient(0, 0, 0, H);
+  mask.addColorStop(0,    'rgba(10,10,15,0.96)');
+  mask.addColorStop(0.28, 'rgba(10,10,15,0.55)');
+  mask.addColorStop(0.62, 'rgba(10,10,15,0.12)');
+  mask.addColorStop(1,    'rgba(10,10,15,0)');
+  ctx2d.fillStyle = mask;
+  ctx2d.fillRect(0, 0, W, H);
+}
+
 export function isBottomVisualizerFading() {
   return !state.playing &&
     state.visualizerFadeOutUntil > performance.now() &&
@@ -71,7 +156,9 @@ export function drawBottomVisualizer(clearOnly = false) {
   ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx2d.clearRect(0, 0, W, H);
 
-  if (clearOnly || !state.visualizerEnabled) {
+  const fs = document.body.classList.contains('viz-fullscreen');
+
+  if (clearOnly || (!state.visualizerEnabled && !fs)) {
     ctx2d.setTransform(1, 0, 0, 1, 0, 0);
     return;
   }
@@ -172,27 +259,6 @@ export function drawBottomVisualizer(clearOnly = false) {
   const hueA = baseHue1 + Math.sin(hueDrift) * 18;
   const hueB = baseHue2 + Math.sin(hueDrift + 1.8) * 16;
   const hueC = blendHue + 32 + Math.sin(hueDrift + 3.1) * 12;
-  const gradShift = (Math.sin(now * 0.11) * 0.5 + 0.5) * W * 0.17;
-
-  const haze = ctx2d.createLinearGradient(gradShift, H, W - gradShift, 0);
-  haze.addColorStop(0, `hsla(${hueA.toFixed(1)},88%,57%,${(0.08 + pulse * 0.16) * intensity})`);
-  haze.addColorStop(0.225, `hsla(${hueC.toFixed(1)},86%,64%,${(0.06 + pulse * 0.1) * intensity})`);
-  haze.addColorStop(1, `hsla(${hueB.toFixed(1)},92%,56%,0)`);
-  ctx2d.fillStyle = haze;
-  ctx2d.fillRect(0, 0, W, H);
-
-  const bloomLeft = ctx2d.createRadialGradient(W * 0.18, H * 0.9, 0, W * 0.18, H * 0.9, W * 0.42);
-  bloomLeft.addColorStop(0, `hsla(${hueA.toFixed(1)},90%,60%,${(0.12 + bass * 0.28) * intensity})`);
-  bloomLeft.addColorStop(1, `hsla(${hueA.toFixed(1)},90%,60%,0)`);
-  ctx2d.fillStyle = bloomLeft;
-  ctx2d.fillRect(0, 0, W, H);
-
-  const bloomRight = ctx2d.createRadialGradient(W * 0.84, H * 0.88, 0, W * 0.84, H * 0.88, W * 0.44);
-  bloomRight.addColorStop(0, `hsla(${hueB.toFixed(1)},94%,55%,${(0.12 + high * 0.22) * intensity})`);
-  bloomRight.addColorStop(1, `hsla(${hueB.toFixed(1)},94%,55%,0)`);
-  ctx2d.fillStyle = bloomRight;
-  ctx2d.fillRect(0, 0, W, H);
-
   function drawWave(yBase, ampScale, colorA, colorB, alpha, lineW, speed, freq) {
     const xShift = (Math.sin(now * (0.06 + speed * 0.02)) * 0.5 + 0.5) * W * 0.28;
     const grad = ctx2d.createLinearGradient(xShift, H, W - xShift * 0.35, 0);
@@ -231,12 +297,37 @@ export function drawBottomVisualizer(clearOnly = false) {
     ctx2d.stroke();
   }
 
-  ctx2d.shadowBlur = 24;
-  ctx2d.shadowColor = 'rgba(124,58,237,0.2)';
-  drawWave(H - VISUALIZER_TUNING.baseOffsetA, VISUALIZER_TUNING.ampA, `hsla(${hueA.toFixed(1)},90%,60%,0.62)`, `hsla(${hueB.toFixed(1)},92%,56%,0.54)`, 0.34 + loudness * 0.9, 18, 1.2, 8.8);
-  drawWave(H - VISUALIZER_TUNING.baseOffsetB, VISUALIZER_TUNING.ampB, `hsla(${hueC.toFixed(1)},88%,68%,0.52)`, `hsla(${hueB.toFixed(1)},94%,62%,0.48)`, 0.28 + loudness * 0.7, 14, 1.55, 10.2);
-  ctx2d.shadowBlur = 0;
-  drawWave(H - VISUALIZER_TUNING.baseOffsetC, VISUALIZER_TUNING.ampC, `hsla(${hueA.toFixed(1)},76%,80%,0.42)`, `hsla(${hueB.toFixed(1)},86%,76%,0.36)`, 0.24 + loudness * 0.5, 10, 1.8, 11.4);
+  if (fs) {
+    drawFullscreenVisualizer(ctx2d, W, H, bass, lowMid, high, loudness,
+      hueA, hueB, hueC, animPhase, pointCount, now, intensity, pulse);
+  } else {
+    const gradShift = (Math.sin(now * 0.11) * 0.5 + 0.5) * W * 0.17;
+    const haze = ctx2d.createLinearGradient(gradShift, H, W - gradShift, 0);
+    haze.addColorStop(0, `hsla(${hueA.toFixed(1)},88%,57%,${(0.08 + pulse * 0.16) * intensity})`);
+    haze.addColorStop(0.225, `hsla(${hueC.toFixed(1)},86%,64%,${(0.06 + pulse * 0.1) * intensity})`);
+    haze.addColorStop(1, `hsla(${hueB.toFixed(1)},92%,56%,0)`);
+    ctx2d.fillStyle = haze;
+    ctx2d.fillRect(0, 0, W, H);
+
+    const bloomLeft = ctx2d.createRadialGradient(W * 0.18, H * 0.9, 0, W * 0.18, H * 0.9, W * 0.42);
+    bloomLeft.addColorStop(0, `hsla(${hueA.toFixed(1)},90%,60%,${(0.12 + bass * 0.28) * intensity})`);
+    bloomLeft.addColorStop(1, `hsla(${hueA.toFixed(1)},90%,60%,0)`);
+    ctx2d.fillStyle = bloomLeft;
+    ctx2d.fillRect(0, 0, W, H);
+
+    const bloomRight = ctx2d.createRadialGradient(W * 0.84, H * 0.88, 0, W * 0.84, H * 0.88, W * 0.44);
+    bloomRight.addColorStop(0, `hsla(${hueB.toFixed(1)},94%,55%,${(0.12 + high * 0.22) * intensity})`);
+    bloomRight.addColorStop(1, `hsla(${hueB.toFixed(1)},94%,55%,0)`);
+    ctx2d.fillStyle = bloomRight;
+    ctx2d.fillRect(0, 0, W, H);
+
+    ctx2d.shadowBlur = 24;
+    ctx2d.shadowColor = 'rgba(124,58,237,0.2)';
+    drawWave(H - VISUALIZER_TUNING.baseOffsetA, VISUALIZER_TUNING.ampA, `hsla(${hueA.toFixed(1)},90%,60%,0.62)`, `hsla(${hueB.toFixed(1)},92%,56%,0.54)`, 0.34 + loudness * 0.9, 18, 1.2, 8.8);
+    drawWave(H - VISUALIZER_TUNING.baseOffsetB, VISUALIZER_TUNING.ampB, `hsla(${hueC.toFixed(1)},88%,68%,0.52)`, `hsla(${hueB.toFixed(1)},94%,62%,0.48)`, 0.28 + loudness * 0.7, 14, 1.55, 10.2);
+    ctx2d.shadowBlur = 0;
+    drawWave(H - VISUALIZER_TUNING.baseOffsetC, VISUALIZER_TUNING.ampC, `hsla(${hueA.toFixed(1)},76%,80%,0.42)`, `hsla(${hueB.toFixed(1)},86%,76%,0.36)`, 0.24 + loudness * 0.5, 10, 1.8, 11.4);
+  }
 
   if (!state.playing && performance.now() >= state.visualizerFadeOutUntil) {
     clearBottomVisualizerFade();
@@ -258,7 +349,14 @@ export function updateTimeDisplay() {
         : Math.min((state.audioCtx.currentTime - state.startTime) * state.speed, state.duration);
   const dispPos = state.speed ? rawPos / state.speed : 0;
   const dispDur = (state.duration && state.speed) ? state.duration / state.speed : 0;
-  setText($id('timeDisplay'), `${fmt(dispPos)} / ${fmt(dispDur)}`);
+  const timeStr = `${fmt(dispPos)} / ${fmt(dispDur)}`;
+  setText($id('timeDisplay'), timeStr);
+
+  // Sync fullscreen bar
+  const fsFill = $id('vizFsProgressFill');
+  if (fsFill) fsFill.style.width = `${dispDur > 0 ? (dispPos / dispDur * 100) : 0}%`;
+  const fsTime = $id('vizFsTime');
+  if (fsTime) setText(fsTime, timeStr);
 }
 
 export function startAnimLoop() {
@@ -267,9 +365,20 @@ export function startAnimLoop() {
     drawWaveform();
     drawBottomVisualizer();
     updateTimeDisplay();
-    if (state.playing || isBottomVisualizerFading()) {
+    if (state.playing || isBottomVisualizerFading() || document.body.classList.contains('viz-fullscreen')) {
       state.animFrame = requestAnimationFrame(loop);
+    } else {
+      state.animFrame = null;
     }
   }
   state.animFrame = requestAnimationFrame(loop);
+}
+
+export function stopAnimLoopIfIdle() {
+  if (!state.playing && !isBottomVisualizerFading() && !document.body.classList.contains('viz-fullscreen')) {
+    if (state.animFrame) {
+      cancelAnimationFrame(state.animFrame);
+      state.animFrame = null;
+    }
+  }
 }

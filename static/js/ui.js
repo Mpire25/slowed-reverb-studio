@@ -20,6 +20,8 @@ import {
   updateBottomVisualizerPlaybackState,
   beginBottomVisualizerFade,
   updateTimeDisplay,
+  startAnimLoop,
+  stopAnimLoopIfIdle,
 } from './visualizer.js';
 import { handleFileObject, resetStudio, updateSourceImportUI } from './loader.js';
 import { initImporter } from './importer.js';
@@ -356,4 +358,212 @@ document.addEventListener('keydown', e => {
     updateMuteBtn();
     updateVolumeTrack();
   }
+  if ((e.key === 'f' || e.key === 'F') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+    if (state.audioBuffer) { e.preventDefault(); toggleVizFullscreen(); }
+  }
+  if (e.key === 'Escape' && document.body.classList.contains('viz-fullscreen')) {
+    exitVizFullscreen();
+  }
 });
+
+// ─── Visualizer Fullscreen ───────────────────────────────────────────────────
+function syncVizFsPlayBtn() {
+  const icon = $id('vizFsPlayIcon');
+  if (!icon) return;
+  if (state.playing) {
+    icon.innerHTML = '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>';
+  } else {
+    icon.innerHTML = '<polygon points="5,3 19,12 5,21"/>';
+  }
+}
+
+function syncVizFsMuteBtn() {
+  const btn = $id('vizFsMuteBtn');
+  if (!btn) return;
+  const muted = state.muted || state.volume === 0;
+  btn.setAttribute('aria-pressed', String(muted));
+  const icon = $id('vizFsMuteIcon');
+  if (!icon) return;
+  if (muted) {
+    icon.innerHTML = '<path d="M11 5L6 9H2v6h4l5 4V5z" fill="currentColor" stroke="none"/><line x1="23" y1="9" x2="17" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="17" y1="9" x2="23" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>';
+  } else {
+    icon.innerHTML = '<path d="M11 5L6 9H2v6h4l5 4V5z" fill="currentColor" stroke="none"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>';
+  }
+}
+
+function syncVizFsLoopBtn() {
+  const btn = $id('vizFsLoopBtn');
+  if (!btn) return;
+  btn.classList.toggle('active', state.loopEnabled);
+  btn.setAttribute('aria-pressed', String(state.loopEnabled));
+  btn.title = state.loopEnabled ? 'Loop On' : 'Loop Off';
+}
+
+function syncVizFsMeta() {
+  const titleEl = $id('trackTitle');
+  const artistEl = $id('trackArtist');
+  const artEl = $id('albumArt');
+  const fsTitle = $id('vizFsTitle');
+  const fsArtist = $id('vizFsArtist');
+  const fsArt = $id('vizFsArt');
+  if (fsTitle) setText(fsTitle, titleEl ? titleEl.textContent : '—');
+  if (fsArtist) setText(fsArtist, artistEl ? artistEl.textContent : '—');
+  if (fsArt && artEl) fsArt.innerHTML = artEl.innerHTML;
+}
+
+function syncVizFsVolumeSlider() {
+  const slider = $id('vizFsVolumeSlider');
+  if (!slider) return;
+  slider.value = Math.round(state.volume * 100);
+  const pct = state.muted ? 0 : Math.round(state.volume * 100);
+  slider.style.background = `linear-gradient(to right, var(--accent1) 0%, var(--accent2) ${pct}%, var(--border) ${pct}%)`;
+}
+
+function syncVizFullscreenBar() {
+  syncVizFsPlayBtn();
+  syncVizFsMuteBtn();
+  syncVizFsLoopBtn();
+  syncVizFsVolumeSlider();
+  syncVizFsMeta();
+  updateTimeDisplay();
+}
+
+function enterVizFullscreen() {
+  document.body.classList.add('viz-fullscreen');
+  syncVizFullscreenBar();
+  if (!state.animFrame) startAnimLoop();
+}
+
+function exitVizFullscreen() {
+  document.body.classList.remove('viz-fullscreen');
+  stopAnimLoopIfIdle();
+  drawBottomVisualizer(!state.playing);
+}
+
+function toggleVizFullscreen() {
+  if (document.body.classList.contains('viz-fullscreen')) {
+    exitVizFullscreen();
+  } else {
+    enterVizFullscreen();
+  }
+}
+
+$id('vizFullscreenBtn').addEventListener('click', toggleVizFullscreen);
+$id('vizFsExitBtn').addEventListener('click', exitVizFullscreen);
+
+// Fullscreen transport mirrors main transport
+$id('vizFsPlayBtn').addEventListener('click', () => {
+  if (!state.audioBuffer) return;
+  if (state.playing) pause(); else play();
+  syncVizFsPlayBtn();
+});
+$id('vizFsStartBtn').addEventListener('click', () => $id('startBtn').click());
+$id('vizFsEndBtn').addEventListener('click', () => $id('endBtn').click());
+
+$id('vizFsLoopBtn').addEventListener('click', () => {
+  $id('loopBtn').click();
+  syncVizFsLoopBtn();
+});
+
+$id('vizFsMuteBtn').addEventListener('click', () => {
+  state.muted = !state.muted;
+  applyVolume();
+  updateMuteBtn();
+  updateVolumeTrack();
+  syncVizFsMuteBtn();
+  syncVizFsVolumeSlider();
+});
+
+$id('vizFsVolumeSlider').addEventListener('input', e => {
+  state.volume = e.target.value / 100;
+  if (state.muted && state.volume > 0) state.muted = false;
+  applyVolume();
+  updateMuteBtn();
+  updateVolumeTrack();
+  syncVizFsMuteBtn();
+  syncVizFsVolumeSlider();
+});
+$id('vizFsVolumeSlider').addEventListener('pointerup', e => e.target.blur());
+
+// Progress bar scrubbing in fullscreen
+(function () {
+  const track = $id('vizFsProgressTrack');
+  let fsScrubbing = false;
+
+  function getFsFraction(e) {
+    const rect = track.getBoundingClientRect();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    return Math.max(0, Math.min(1, x / rect.width));
+  }
+
+  track.addEventListener('mousedown', e => {
+    if (!state.audioBuffer) return;
+    fsScrubbing = true;
+    state.scrubFraction = getFsFraction(e);
+    silenceForScrub();
+    drawWaveform();
+    updateTimeDisplay();
+  });
+  window.addEventListener('mousemove', e => {
+    if (!fsScrubbing) return;
+    state.scrubFraction = getFsFraction(e);
+    drawWaveform();
+    updateTimeDisplay();
+  });
+  window.addEventListener('mouseup', () => {
+    if (!fsScrubbing) return;
+    fsScrubbing = false;
+    const fraction = state.scrubFraction;
+    state.scrubFraction = null;
+    seekTo(fraction);
+    drawWaveform();
+    updateTimeDisplay();
+  });
+  track.addEventListener('touchstart', e => {
+    if (!state.audioBuffer) return;
+    e.preventDefault();
+    fsScrubbing = true;
+    state.scrubFraction = getFsFraction(e);
+    silenceForScrub();
+    updateTimeDisplay();
+  }, { passive: false });
+  track.addEventListener('touchmove', e => {
+    if (!fsScrubbing) return;
+    e.preventDefault();
+    state.scrubFraction = getFsFraction(e);
+    updateTimeDisplay();
+  }, { passive: false });
+  track.addEventListener('touchend', e => {
+    if (!fsScrubbing) return;
+    e.preventDefault();
+    fsScrubbing = false;
+    const fraction = state.scrubFraction;
+    state.scrubFraction = null;
+    seekTo(fraction);
+    updateTimeDisplay();
+  }, { passive: false });
+})();
+
+// Keep fullscreen bar meta in sync when track changes (MutationObserver)
+(function () {
+  const obs = new MutationObserver(() => {
+    if (document.body.classList.contains('viz-fullscreen')) syncVizFsMeta();
+  });
+  const titleEl = $id('trackTitle');
+  const artistEl = $id('trackArtist');
+  const artEl = $id('albumArt');
+  if (titleEl) obs.observe(titleEl, { characterData: true, childList: true, subtree: true });
+  if (artistEl) obs.observe(artistEl, { characterData: true, childList: true, subtree: true });
+  if (artEl) obs.observe(artEl, { childList: true, subtree: true, attributes: true });
+})();
+
+// Keep fullscreen play button in sync (poll state.playing each anim frame via drawBottomVisualizer)
+// We hook into the play/pause events by overriding the functions locally
+(function () {
+  // Patch: after play/pause clicks on main transport, sync fullscreen bar
+  const mainPlayBtn = $id('playBtn');
+  mainPlayBtn.addEventListener('click', () => {
+    // Synced after the event propagates and state updates
+    requestAnimationFrame(syncVizFsPlayBtn);
+  }, true);
+})();
