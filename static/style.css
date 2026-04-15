@@ -679,6 +679,7 @@ body.playlist-open .playlist-mobile-bar{transform:translateY(0)}
   body.playlist-open .app-wrap{padding-bottom:var(--playlist-mobile-bar-height)}
   body.playlist-open .new-song-btn{bottom:calc(var(--new-song-btn-bottom) + var(--playlist-mobile-bar-height))}
   .playlist-panel{display:none!important}
+  .app-wrap{justify-content:center}
 }
 
 /* ── Visualizer Fullscreen Playlist Overlay ── */
