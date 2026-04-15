@@ -450,6 +450,7 @@ function exitVizFullscreen() {
     document.body.classList.remove('viz-fullscreen');
     stopAnimLoopIfIdle();
     drawBottomVisualizer(!state.playing);
+    drawWaveform();
   });
 }
 
