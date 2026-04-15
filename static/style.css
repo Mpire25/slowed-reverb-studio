@@ -671,11 +671,11 @@ body.playlist-open .playlist-mobile-bar{transform:translateY(0)}
 .playlist-mobile-overlay-close:hover{color:var(--text)}
 .playlist-mobile-overlay-list{flex:1;overflow-y:auto}
 
-@media(min-width:740px){
+@media(min-width:820px){
   .playlist-mobile-bar,.playlist-mobile-overlay{display:none!important}
   body.playlist-open .app-wrap{padding-bottom:0}
 }
-@media(max-width:739px){
+@media(max-width:819px){
   body.playlist-open .app-wrap{padding-bottom:var(--playlist-mobile-bar-height)}
   body.playlist-open .new-song-btn{bottom:calc(var(--new-song-btn-bottom) + var(--playlist-mobile-bar-height))}
   .playlist-panel{display:none!important}
