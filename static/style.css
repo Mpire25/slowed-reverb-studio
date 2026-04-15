@@ -681,6 +681,30 @@ body.playlist-open .playlist-mobile-bar{transform:translateY(0)}
   .playlist-panel{display:none!important}
 }
 
+/* ── Visualizer Fullscreen Playlist Overlay ── */
+#vizFsPlaylistOverlay{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:83px;z-index:150;flex-direction:column;
+  background:rgba(8,8,18,0.93);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  transform:translateY(-100%);visibility:hidden;
+  transition:transform .35s cubic-bezier(.4,0,.2,1),visibility .35s;
+}
+body.viz-fullscreen #vizFsPlaylistOverlay{display:flex}
+#vizFsPlaylistOverlay.open{transform:translateY(0);visibility:visible}
+@media(max-width:819px){
+  #vizFsPlaylistOverlay{bottom:75px}
+}
+.viz-fs-pl-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px 18px 14px;border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0;
+}
+.viz-fs-pl-name{font-size:.95rem;font-weight:600;color:var(--text)}
+.viz-fs-pl-close{
+  background:none;border:none;cursor:pointer;color:var(--muted);
+  padding:4px;border-radius:6px;line-height:0;transition:color .2s;
+}
+.viz-fs-pl-close:hover{color:var(--text)}
+.viz-fs-pl-list{flex:1;overflow-y:auto}
+
 /* ── Visualizer Fullscreen Transition Overlay ── */
 #vizFsTransitionOverlay{
   position:fixed;inset:0;background:var(--bg);
@@ -818,7 +842,7 @@ body.viz-fullscreen #vizFullscreenBar{display:flex}
   .viz-fs-left{flex:0 0 auto;max-width:130px}
   .viz-fs-right{flex:0 0 auto;gap:2px}
   .viz-fs-volume,.viz-fs-time{display:none}
-  .viz-fs-right .viz-fs-icon-btn:not(#vizFsMuteBtn){display:none}
+  .viz-fs-right .viz-fs-icon-btn:not(#vizFsMuteBtn):not(#vizFsPlaylistBtn){display:none}
   .viz-fs-inner{padding:0 14px;gap:8px;height:72px}
   .viz-fs-title{font-size:.82rem}
   .viz-fs-artist{font-size:.72rem}
