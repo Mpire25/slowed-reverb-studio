@@ -253,7 +253,11 @@ export function createPlaylistView({ onJumpToTrack, onToggleLoop }) {
     if (vizFsPlName) vizFsPlName.textContent = name;
     const vizFsPlBtn = $id('vizFsPlaylistBtn');
     const vizFsPlClose = $id('vizFsPlaylistClose');
-    if (vizFsPlBtn) vizFsPlBtn.onclick = openVizFsOverlay;
+    if (vizFsPlBtn) vizFsPlBtn.onclick = () => {
+      const overlay = $id('vizFsPlaylistOverlay');
+      if (overlay && overlay.classList.contains('open')) closeVizFsOverlay();
+      else openVizFsOverlay();
+    };
     if (vizFsPlClose) vizFsPlClose.onclick = closeVizFsOverlay;
 
     setLoopEnabled(loopEnabled);
