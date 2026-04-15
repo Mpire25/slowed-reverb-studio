@@ -683,9 +683,9 @@ body.playlist-open .playlist-mobile-bar{transform:translateY(0)}
 
 /* ── Visualizer Fullscreen Playlist Overlay ── */
 #vizFsPlaylistOverlay{
-  display:none;position:fixed;top:0;left:0;right:0;bottom:83px;z-index:150;flex-direction:column;
-  background:rgba(8,8,18,0.93);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
-  transform:translateY(-100%);visibility:hidden;
+  display:none;position:fixed;top:0;left:0;right:0;bottom:83px;z-index:90;flex-direction:column;
+  background:rgba(8,8,18,0.55);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  transform:translateY(100%);visibility:hidden;
   transition:transform .35s cubic-bezier(.4,0,.2,1),visibility .35s;
 }
 body.viz-fullscreen #vizFsPlaylistOverlay{display:flex}
