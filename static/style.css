@@ -656,10 +656,13 @@ body.playlist-open .playlist-mobile-bar{transform:translateY(0)}
 .playlist-mobile-overlay{
   display:flex;position:fixed;inset:0;z-index:200;flex-direction:column;
   background:var(--panel-bg);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-  transform:translateY(100%);visibility:hidden;
-  transition:transform .35s cubic-bezier(.4,0,.2,1),visibility .35s;
+  transform:translateY(100%);opacity:0;visibility:hidden;
+  transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .2s ease,visibility 0s linear .35s;
 }
-.playlist-mobile-overlay.open{transform:translateY(0);visibility:visible}
+.playlist-mobile-overlay.open{
+  transform:translateY(0);opacity:1;visibility:visible;
+  transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .24s ease,visibility 0s;
+}
 .playlist-mobile-overlay-header{
   display:flex;align-items:center;justify-content:space-between;
   padding:20px 18px 14px;border-bottom:1px solid var(--border);flex-shrink:0;
@@ -684,19 +687,24 @@ body.playlist-open .playlist-mobile-bar{transform:translateY(0)}
 
 /* ── Visualizer Fullscreen Playlist Overlay ── */
 #vizFsPlaylistOverlay{
+  --viz-fs-overlay-bottom-gap:83px;
   display:none;position:fixed;top:0;left:0;right:0;bottom:83px;z-index:90;flex-direction:column;
   background:rgba(8,8,18,0.55);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
-  transform:translateY(100%);visibility:hidden;
-  transition:transform .35s cubic-bezier(.4,0,.2,1),visibility .35s;
+  transform:translateY(calc(100% + var(--viz-fs-overlay-bottom-gap)));opacity:0;visibility:hidden;
+  transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .12s ease .23s,visibility 0s linear .35s;
 }
 body.viz-fullscreen #vizFsPlaylistOverlay{display:flex}
-#vizFsPlaylistOverlay.open{transform:translateY(0);visibility:visible}
+#vizFsPlaylistOverlay.open{
+  transform:translateY(0);opacity:1;visibility:visible;
+  transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .24s ease,visibility 0s;
+}
 @media(max-width:819px){
-  #vizFsPlaylistOverlay{bottom:75px}
+  #vizFsPlaylistOverlay{--viz-fs-overlay-bottom-gap:75px;bottom:75px}
 }
 .viz-fs-pl-header{
   display:flex;align-items:center;justify-content:space-between;
-  padding:20px 18px 14px;border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0;
+  padding:20px 18px 14px;border-bottom:1px solid var(--border);flex-shrink:0;
+  opacity:.88;
 }
 .viz-fs-pl-name{font-size:.95rem;font-weight:600;color:var(--text)}
 .viz-fs-pl-close{
