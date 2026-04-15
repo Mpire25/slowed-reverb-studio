@@ -174,6 +174,11 @@
       </button>
       <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="100" step="1" aria-label="Volume">
     </div>
+    <button class="transport-icon-btn viz-fs-toggle-btn" id="vizFullscreenBtn" title="Visualizer Fullscreen" aria-label="Visualizer Fullscreen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+      </svg>
+    </button>
   </div>
 
   <!-- Effects -->
@@ -341,9 +346,93 @@
   <div class="playlist-track-list playlist-mobile-overlay-list" id="playlistMobileTrackList"></div>
 </div>
 
+<!-- Visualizer fullscreen playlist overlay -->
+<div id="vizFsPlaylistOverlay">
+  <div class="viz-fs-pl-header">
+    <div class="viz-fs-pl-name" id="vizFsPlName"></div>
+    <button class="viz-fs-pl-close" id="vizFsPlaylistClose" aria-label="Close playlist">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="20" height="20">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+  </div>
+  <div class="playlist-track-list viz-fs-pl-list" id="vizFsPlaylistList"></div>
+</div>
+
+<!-- Visualizer fullscreen transition overlay -->
+<div id="vizFsTransitionOverlay"></div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 <canvas id="bottomVisualizer" class="bottom-visualizer" aria-hidden="true"></canvas>
+
+<!-- Visualizer Fullscreen Bar -->
+<div id="vizFullscreenBar" aria-label="Player controls">
+  <div class="viz-fs-progress-track" id="vizFsProgressTrack">
+    <div class="viz-fs-progress-fill" id="vizFsProgressFill"></div>
+  </div>
+  <div class="viz-fs-inner">
+    <!-- Left: art + meta -->
+    <div class="viz-fs-left">
+      <div class="viz-fs-art" id="vizFsArt">🎵</div>
+      <div class="viz-fs-meta">
+        <div class="viz-fs-title" id="vizFsTitle">—</div>
+        <div class="viz-fs-artist" id="vizFsArtist">—</div>
+      </div>
+    </div>
+    <!-- Center: transport -->
+    <div class="viz-fs-center">
+      <button class="viz-fs-icon-btn" id="vizFsStartBtn" title="Previous/Start" aria-label="Previous">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <rect x="4.5" y="4" width="2.5" height="16" rx="1"/>
+          <polygon points="18,5 8.5,12 18,19"/>
+        </svg>
+      </button>
+      <button class="viz-fs-play-btn" id="vizFsPlayBtn" aria-label="Play/Pause">
+        <svg id="vizFsPlayIcon" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+      </button>
+      <button class="viz-fs-icon-btn" id="vizFsEndBtn" title="Next/End" aria-label="Next">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <polygon points="6,5 15.5,12 6,19"/>
+          <rect x="17" y="4" width="2.5" height="16" rx="1"/>
+        </svg>
+      </button>
+      <span class="viz-fs-time" id="vizFsTime">0:00 / 0:00</span>
+    </div>
+    <!-- Right: loop, playlist, volume, exit -->
+    <div class="viz-fs-right">
+      <button class="viz-fs-icon-btn loop-btn" id="vizFsLoopBtn" title="Loop Off" aria-label="Toggle Loop" aria-pressed="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="url(#vizFsLoopGrad)" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <defs>
+            <linearGradient id="vizFsLoopGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" class="loop-grad-stop1"/>
+              <stop offset="100%" class="loop-grad-stop2"/>
+            </linearGradient>
+          </defs>
+          <path d="M8 7h9l-2.5-2.5M16 17H7l2.5 2.5M17 7c2 0 3 1 3 3v1M7 17c-2 0-3-1-3-3v-1"/>
+        </svg>
+      </button>
+      <button class="viz-fs-icon-btn" id="vizFsPlaylistBtn" title="Playlist" aria-label="Show Playlist">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="20" height="20">
+          <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/>
+          <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+        </svg>
+      </button>
+      <button class="viz-fs-icon-btn" id="vizFsMuteBtn" title="Mute" aria-label="Toggle Mute" aria-pressed="false">
+        <svg id="vizFsMuteIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 5L6 9H2v6h4l5 4V5z" fill="currentColor" stroke="none"/>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+        </svg>
+      </button>
+      <input type="range" id="vizFsVolumeSlider" class="volume-slider viz-fs-volume" min="0" max="100" value="100" step="1" aria-label="Volume">
+      <button class="viz-fs-exit-btn" id="vizFsExitBtn" aria-label="Exit Visualizer Fullscreen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+</div>
 
 <script src="/lib/lame.min.js"></script>
 <script type="module" src="/js/ui.js"></script>

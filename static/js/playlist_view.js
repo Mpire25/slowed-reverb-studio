@@ -65,6 +65,35 @@ export function createPlaylistView({ onJumpToTrack, onToggleLoop }) {
     if (panel) panel.style.height = '';
   }
 
+  function closeVizFsOverlay() {
+    const overlay = $id('vizFsPlaylistOverlay');
+    if (overlay) overlay.classList.remove('open');
+  }
+
+  function openVizFsOverlay() {
+    const overlay = $id('vizFsPlaylistOverlay');
+    if (!overlay) return;
+    overlay.classList.add('open');
+    const mainList = $id('playlistTrackList');
+    const fsList = $id('vizFsPlaylistList');
+    if (mainList && fsList) {
+      fsList.innerHTML = '';
+      for (const row of mainList.querySelectorAll('.pl-row')) {
+        const clone = row.cloneNode(true);
+        clone.removeAttribute('id');
+        clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+        fsList.appendChild(clone);
+      }
+    }
+    if (!fsList) return;
+    fsList.querySelectorAll('.pl-row').forEach(row => {
+      row.addEventListener('click', () => {
+        closeVizFsOverlay();
+        onJumpToTrack(parseInt(row.dataset.index, 10));
+      });
+    });
+  }
+
   function closeMobileOverlay() {
     const overlay = $id('playlistMobileOverlay');
     if (overlay) overlay.classList.remove('open');
@@ -219,6 +248,18 @@ export function createPlaylistView({ onJumpToTrack, onToggleLoop }) {
     if (mobileBtn) mobileBtn.onclick = openMobileOverlay;
     if (mobileClose) mobileClose.onclick = closeMobileOverlay;
 
+    // Fullscreen playlist overlay wiring
+    const vizFsPlName = $id('vizFsPlName');
+    if (vizFsPlName) vizFsPlName.textContent = name;
+    const vizFsPlBtn = $id('vizFsPlaylistBtn');
+    const vizFsPlClose = $id('vizFsPlaylistClose');
+    if (vizFsPlBtn) vizFsPlBtn.onclick = () => {
+      const overlay = $id('vizFsPlaylistOverlay');
+      if (overlay && overlay.classList.contains('open')) closeVizFsOverlay();
+      else openVizFsOverlay();
+    };
+    if (vizFsPlClose) vizFsPlClose.onclick = closeVizFsOverlay;
+
     setLoopEnabled(loopEnabled);
     startPanelHeightSync();
   }
@@ -236,7 +277,14 @@ export function createPlaylistView({ onJumpToTrack, onToggleLoop }) {
     if (list) list.innerHTML = '';
     const mobileList = $id('playlistMobileTrackList');
     if (mobileList) mobileList.innerHTML = '';
+    const vizFsList = $id('vizFsPlaylistList');
+    if (vizFsList) vizFsList.innerHTML = '';
     closeMobileOverlay();
+    closeVizFsOverlay();
+    const vizFsPlBtn = $id('vizFsPlaylistBtn');
+    const vizFsPlClose = $id('vizFsPlaylistClose');
+    if (vizFsPlBtn) vizFsPlBtn.onclick = null;
+    if (vizFsPlClose) vizFsPlClose.onclick = null;
 
     // Restore transport button labels
     const startBtn = $id('startBtn');

@@ -175,7 +175,7 @@ header{display:flex;align-items:center;justify-content:space-between;max-width:1
 .new-song-btn:hover{filter:brightness(1.06);box-shadow:0 14px 36px rgba(var(--accent1-rgb),.45)}
 .new-song-btn:active{transform:translateY(0)}
 .new-song-btn.hidden{display:none}
-@media (max-width:640px){
+@media (max-width:819px){
   .new-song-btn{right:14px;--new-song-btn-bottom:14px;padding:12px 16px 12px 12px;font-size:.88rem}
   .new-song-btn .plus{width:24px;height:24px;font-size:1.05rem}
 }
@@ -656,10 +656,13 @@ body.playlist-open .playlist-mobile-bar{transform:translateY(0)}
 .playlist-mobile-overlay{
   display:flex;position:fixed;inset:0;z-index:200;flex-direction:column;
   background:var(--panel-bg);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-  transform:translateY(100%);visibility:hidden;
-  transition:transform .35s cubic-bezier(.4,0,.2,1),visibility .35s;
+  transform:translateY(100%);opacity:0;visibility:hidden;
+  transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .2s ease,visibility 0s linear .35s;
 }
-.playlist-mobile-overlay.open{transform:translateY(0);visibility:visible}
+.playlist-mobile-overlay.open{
+  transform:translateY(0);opacity:1;visibility:visible;
+  transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .24s ease,visibility 0s;
+}
 .playlist-mobile-overlay-header{
   display:flex;align-items:center;justify-content:space-between;
   padding:20px 18px 14px;border-bottom:1px solid var(--border);flex-shrink:0;
@@ -671,12 +674,185 @@ body.playlist-open .playlist-mobile-bar{transform:translateY(0)}
 .playlist-mobile-overlay-close:hover{color:var(--text)}
 .playlist-mobile-overlay-list{flex:1;overflow-y:auto}
 
-@media(min-width:740px){
+@media(min-width:820px){
   .playlist-mobile-bar,.playlist-mobile-overlay{display:none!important}
   body.playlist-open .app-wrap{padding-bottom:0}
 }
-@media(max-width:739px){
+@media(max-width:819px){
   body.playlist-open .app-wrap{padding-bottom:var(--playlist-mobile-bar-height)}
   body.playlist-open .new-song-btn{bottom:calc(var(--new-song-btn-bottom) + var(--playlist-mobile-bar-height))}
   .playlist-panel{display:none!important}
+  .app-wrap{justify-content:center}
+}
+
+/* ── Visualizer Fullscreen Playlist Overlay ── */
+#vizFsPlaylistOverlay{
+  --viz-fs-overlay-bottom-gap:83px;
+  display:none;position:fixed;top:0;left:0;right:0;bottom:83px;z-index:90;flex-direction:column;
+  background:rgba(8,8,18,0.55);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  transform:translateY(calc(100% + var(--viz-fs-overlay-bottom-gap)));opacity:0;visibility:hidden;
+  transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .12s ease .23s,visibility 0s linear .35s;
+}
+body.viz-fullscreen #vizFsPlaylistOverlay{display:flex}
+#vizFsPlaylistOverlay.open{
+  transform:translateY(0);opacity:1;visibility:visible;
+  transition:transform .35s cubic-bezier(.4,0,.2,1),opacity .24s ease,visibility 0s;
+}
+@media(max-width:819px){
+  #vizFsPlaylistOverlay{--viz-fs-overlay-bottom-gap:75px;bottom:75px}
+}
+.viz-fs-pl-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px 18px 14px;border-bottom:1px solid var(--border);flex-shrink:0;
+  opacity:.88;
+}
+.viz-fs-pl-name{font-size:.95rem;font-weight:600;color:var(--text)}
+.viz-fs-pl-close{
+  background:none;border:none;cursor:pointer;color:var(--muted);
+  padding:4px;border-radius:6px;line-height:0;transition:color .2s;
+}
+.viz-fs-pl-close:hover{color:var(--text)}
+.viz-fs-pl-list{flex:1;overflow-y:auto}
+
+/* ── Visualizer Fullscreen Transition Overlay ── */
+#vizFsTransitionOverlay{
+  position:fixed;inset:0;background:var(--bg);
+  z-index:500;opacity:0;pointer-events:none;
+  transition:opacity .22s ease;
+}
+#vizFsTransitionOverlay.visible{opacity:1;pointer-events:auto}
+
+/* ── Visualizer Fullscreen Toggle Button ── */
+.viz-fs-toggle-btn{opacity:.6}
+.viz-fs-toggle-btn:hover{opacity:1}
+
+/* ── Visualizer Fullscreen Mode ── */
+body.viz-fullscreen{overflow:hidden}
+body.viz-fullscreen header,
+body.viz-fullscreen .app-wrap,
+body.viz-fullscreen .new-song-btn,
+body.viz-fullscreen .playlist-mobile-bar,
+body.viz-fullscreen .playlist-mobile-overlay{
+  display:none!important
+}
+body.viz-fullscreen #bottomVisualizer{
+  left:0!important;
+  width:100%!important;
+  height:100dvh!important;
+  bottom:0!important;
+  filter:none!important;
+  transform:none!important;
+  -webkit-mask-image:none!important;
+  mask-image:none!important;
+  opacity:1!important;
+  transition:none!important;
+  z-index:55;
+}
+
+/* ── Visualizer Fullscreen Bar ── */
+#vizFullscreenBar{
+  display:none;
+  position:fixed;bottom:0;left:0;right:0;
+  z-index:100;
+  flex-direction:column;
+  backdrop-filter:blur(28px) saturate(160%);
+  -webkit-backdrop-filter:blur(28px) saturate(160%);
+  background:linear-gradient(to bottom,rgba(5,5,10,0.4) 0%,rgba(8,8,18,0.88) 100%);
+  border-top:1px solid rgba(255,255,255,0.07);
+}
+body.viz-fullscreen #vizFullscreenBar{display:flex}
+
+.viz-fs-progress-track{
+  height:3px;background:rgba(255,255,255,0.1);cursor:pointer;
+  position:relative;flex-shrink:0;
+  transition:height .18s ease;
+}
+.viz-fs-progress-track:hover{height:5px}
+.viz-fs-progress-fill{
+  height:100%;pointer-events:none;width:0%;
+  background:linear-gradient(90deg,var(--accent1),var(--accent2));
+}
+
+.viz-fs-inner{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 28px;height:80px;gap:16px;min-width:0;
+}
+
+.viz-fs-left{
+  display:flex;align-items:center;gap:14px;
+  min-width:0;flex:0 1 280px;
+}
+.viz-fs-art{
+  width:52px;height:52px;border-radius:8px;flex-shrink:0;
+  background:linear-gradient(135deg,rgba(124,58,237,.35),rgba(6,182,212,.35));
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.4rem;overflow:hidden;position:relative;
+}
+.viz-fs-art img,.viz-fs-art .album-art-img{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:8px;
+}
+.viz-fs-meta{min-width:0}
+.viz-fs-title{
+  font-size:.9rem;font-weight:600;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;color:var(--text);
+}
+.viz-fs-artist{
+  font-size:.76rem;color:var(--muted);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;margin-top:3px;
+}
+
+.viz-fs-center{
+  display:flex;align-items:center;gap:14px;
+  flex:1;justify-content:center;
+}
+.viz-fs-right{
+  display:flex;align-items:center;gap:6px;
+  flex:0 1 280px;justify-content:flex-end;
+}
+
+.viz-fs-icon-btn{
+  padding:7px;border:none;background:transparent;color:var(--muted);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:color .2s,transform .15s ease;flex-shrink:0;border-radius:8px;
+}
+.viz-fs-icon-btn:hover{color:var(--text);transform:scale(1.08)}
+.viz-fs-icon-btn:active{transform:scale(0.92)}
+.viz-fs-icon-btn svg{width:20px;height:20px}
+.viz-fs-icon-btn.loop-btn svg{width:18px;height:18px}
+
+.viz-fs-play-btn{
+  width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--accent1),var(--accent2));
+  color:#fff;display:flex;align-items:center;justify-content:center;
+  transition:transform .1s,box-shadow .2s;flex-shrink:0;
+  box-shadow:0 4px 22px rgba(var(--accent1-rgb),.5);
+}
+.viz-fs-play-btn:hover{transform:scale(1.07);box-shadow:0 6px 30px rgba(var(--accent1-rgb),.65)}
+.viz-fs-play-btn:active{transform:scale(.94)}
+.viz-fs-play-btn svg{width:22px;height:22px}
+
+.viz-fs-time{
+  font-size:.8rem;color:var(--muted);
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+.viz-fs-volume{width:72px;flex:none}
+
+.viz-fs-exit-btn{
+  padding:8px;border:none;
+  background:rgba(255,255,255,0.07);color:var(--muted);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  border-radius:8px;transition:color .2s,background .2s;flex-shrink:0;
+  margin-left:6px;
+}
+.viz-fs-exit-btn:hover{color:var(--text);background:rgba(255,255,255,0.13)}
+.viz-fs-exit-btn svg{width:18px;height:18px}
+
+@media(max-width:819px){
+  .viz-fs-left{flex:0 0 auto;max-width:130px}
+  .viz-fs-right{flex:0 0 auto;gap:2px}
+  .viz-fs-volume,.viz-fs-time{display:none}
+  .viz-fs-right .viz-fs-icon-btn:not(#vizFsMuteBtn):not(#vizFsPlaylistBtn){display:none}
+  .viz-fs-inner{padding:0 14px;gap:8px;height:72px}
+  .viz-fs-title{font-size:.82rem}
+  .viz-fs-artist{font-size:.72rem}
 }
