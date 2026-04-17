@@ -165,6 +165,7 @@ export function handleFileObject(file) {
 
 export function resetStudio() {
   if (window.__playlistCloseHook) window.__playlistCloseHook();
+  document.body.classList.remove('viz-fullscreen');
   stopActiveSource();
   resetAudioNodes();
   if (state.artBlob) { URL.revokeObjectURL(state.artBlob); state.artBlob = null; }
