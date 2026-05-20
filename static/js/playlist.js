@@ -14,6 +14,13 @@ import { createPlaylistView } from './playlist_view.js';
 const BEHIND = 2;
 const MAX_RETRIES = 2;
 
+class PlaylistFileMissingError extends Error {
+  constructor() {
+    super('File not found');
+    this.name = 'PlaylistFileMissingError';
+  }
+}
+
 // ── Playlist state ─────────────────────────────────────────────────────────────
 
 const ps = {
@@ -164,6 +171,38 @@ function _onTrackEnded() {
   jumpToTrack(next);
 }
 
+async function _fetchTrackFile(filePath) {
+  const res = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(filePath)}`);
+  if (res.ok) return res;
+
+  if (res.status === 404) {
+    let data = null;
+    try { data = await res.clone().json(); } catch {}
+    if (!data || data.error === 'File not found') {
+      throw new PlaylistFileMissingError();
+    }
+  }
+
+  throw new Error('Could not fetch track file');
+}
+
+function _markTrackFileMissing(index, { pendingPlay = false } = {}) {
+  const track = ps.tracks[index];
+  if (!track) return;
+
+  track.filePath = null;
+  track.cachedArrayBuffer = null;
+  track.cachedDecodedBuffer = null;
+  track.status = 'pending';
+  track.retries = 0;
+
+  if (pendingPlay) {
+    ps.pendingPlayIndex = index;
+  }
+
+  _updateRowStatus(index);
+}
+
 async function _loadAndPlayTrack(index) {
   const track = ps.tracks[index];
   if (!track || !track.filePath) return;
@@ -175,8 +214,7 @@ async function _loadAndPlayTrack(index) {
     const preDecoded = track.cachedDecodedBuffer;
 
     if (!ab) {
-      const res = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(track.filePath)}`);
-      if (!res.ok) throw new Error('Could not fetch track file');
+      const res = await _fetchTrackFile(track.filePath);
       ab = await res.arrayBuffer();
     }
 
@@ -197,6 +235,13 @@ async function _loadAndPlayTrack(index) {
       preDecodedBuffer: preDecoded || null,
     });
   } catch (err) {
+    if (err instanceof PlaylistFileMissingError) {
+      _markTrackFileMissing(index, { pendingPlay: true });
+      toast(`Loading "${track.name}"…`, 3000, 'info');
+      _prioritizeAndDownload(index);
+      return;
+    }
+
     console.error('Failed to load playlist track:', err);
     toast(`Error loading "${track.name}": ${err.message}`, 5000, 'error');
   }
@@ -208,8 +253,7 @@ async function _prefetchTrack(idx) {
   const track = ps.tracks[idx];
   if (!track || !track.filePath || track.cachedArrayBuffer || track.cachedDecodedBuffer) return;
   try {
-    const res = await fetch(`${SERVER}/api/file?path=${encodeURIComponent(track.filePath)}`);
-    if (!res.ok) return;
+    const res = await _fetchTrackFile(track.filePath);
     const ab = await res.arrayBuffer();
     if (!ps.active || !ps.tracks[idx] || ps.tracks[idx].status !== 'ready') return; // evicted while fetching
     track.cachedArrayBuffer = ab;
@@ -222,6 +266,10 @@ async function _prefetchTrack(idx) {
       // Pre-decode failed — will decode on demand
     }
   } catch (e) {
+    if (e instanceof PlaylistFileMissingError && ps.active && ps.tracks[idx]?.status === 'ready') {
+      _markTrackFileMissing(idx);
+      _downloadNext();
+    }
     // Pre-fetch failed — will fetch on demand
   }
 }
