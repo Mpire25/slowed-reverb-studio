@@ -188,7 +188,9 @@ export function resetStudio() {
   state.artMime = 'image/jpeg';
 
   const urlInput = $id('urlInput');
+  const searchInput = $id('searchInput');
   if (urlInput) urlInput.value = '';
+  if (searchInput) searchInput.value = '';
   const statusEl = $id('importStatus');
   if (statusEl) statusEl.style.display = 'none';
 
@@ -199,5 +201,9 @@ export function resetStudio() {
   void applyThemeFromCurrentTrack();
 
   releaseMediaFocus();
-  if (urlInput) urlInput.focus();
+  requestAnimationFrame(() => {
+    const searchActive = $id('tabSearch')?.classList.contains('active');
+    const inputToFocus = searchActive ? searchInput : urlInput;
+    if (inputToFocus) inputToFocus.focus();
+  });
 }
