@@ -42,6 +42,24 @@ if _env_file.exists():
             os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
 
 
+def _persist_env_key(key, value):
+    """Update (or insert) a key in the .env file and process environment."""
+    env_path = STUDIO_DIR / ".env"
+    lines = env_path.read_text().splitlines() if env_path.exists() else []
+    found = False
+    new_lines = []
+    for line in lines:
+        if line.strip().startswith(f"{key}="):
+            new_lines.append(f"{key}={value}")
+            found = True
+        else:
+            new_lines.append(line)
+    if not found:
+        new_lines.append(f"{key}={value}")
+    env_path.write_text("\n".join(new_lines) + ("\n" if new_lines else ""))
+    os.environ[key] = value
+
+
 def safe_filename(s):
     return re.sub(r'[<>:"/\\|?*]', '', s).strip()
 
@@ -92,10 +110,16 @@ def _spotify_user_token():
     )
     try:
         with urllib.request.urlopen(req) as resp:
-            return json.loads(resp.read())["access_token"]
+            payload = json.loads(resp.read())
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"Failed to refresh Spotify token: {body}") from None
+    # Spotify's PKCE flow rotates refresh tokens: each refresh returns a new
+    # refresh_token and revokes the old one. Persist it or the next refresh fails.
+    new_refresh_token = payload.get("refresh_token")
+    if new_refresh_token and new_refresh_token != refresh_token:
+        _persist_env_key("SPOTIFY_REFRESH_TOKEN", new_refresh_token)
+    return payload["access_token"]
 
 
 def _spotify_get(path, token):
