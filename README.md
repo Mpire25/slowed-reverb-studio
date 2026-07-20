@@ -47,9 +47,9 @@ Then open **`http://localhost:7337`** in your browser.
 
 1. Drag an MP3 onto the drop zone (or click to browse), **or** paste a YouTube/Spotify URL into the import field
 2. Adjust the sliders:
-   - **Speed** — 0.50× to 1.50× (default 0.75×). Lower values create slowed vocals; higher values create sped-up vocals.
-   - **Reverb Mix** — dry/wet blend (default 40%)
-   - **Reverb Decay** — tail length in seconds (default 3s)
+   - **Speed** — 0.50× to 1.50× (default 0.90×). Lower values create slowed vocals; higher values create sped-up vocals.
+   - **Reverb Mix** — dry/wet blend (default 30%)
+   - **Reverb Decay** — tail length in seconds (default 2s)
 3. Hit play to preview
 4. Click **Download MP3** → confirm the filename → exports with correct ID3 tags (title, artist, album art). The suggested name auto-adds `Slowed`/`Sped Up` and `Reverb` only when those effects are active.
 
@@ -90,12 +90,19 @@ slowed-reverb-studio/
       visualizer.js     — bottom visualizer + animation loop
       waveform.js       — waveform rendering
       loader.js         — file loading, track UI
-      importer.js       — SSE import flow
+      importer.js       — import orchestration
+      importer_progress.js   — segmented import progress UI
+      importer_search.js     — import search suggestions
+      importer_stage_text.js — rotating import status messages
+      importer_stream.js     — SSE connection and event parsing
+      importer_view.js       — import form and progress view updates
       spotify_auth.js   — Spotify OAuth connect/disconnect status UI
       exporter.js       — MP3 export
       settings.js       — settings persistence
       controls.js       — shared slider/loop UI sync helpers
-      playlist.js       — playlist state, panel UI, progressive download + auto-advance
+      playlist.js       — playlist state, progressive download + auto-advance
+      playlist_view.js  — playlist panel and overlay UI
+      mediasession.js   — OS media controls and metadata
       dom.js            — cached DOM lookup + UI utilities
       theme.js          — color extraction + CSS theming
       id3.js            — ID3v2 reader/writer
@@ -108,7 +115,7 @@ slowed-reverb-studio/
 
 ## Technical notes
 
-- MP3 encoding uses [lamejs](https://github.com/zhuker/lamejs) served at `static/lib/lame.min.js` at 320 kbps stereo
+- MP3 encoding uses [lamejs](https://github.com/zhuker/lamejs) served at `static/lib/lame.min.js` at 192 kbps stereo
 - Reverb impulse response is generated algorithmically (exponential noise decay) — no IR file needed
 - Export renders via `OfflineAudioContext` then encodes to MP3 with a hand-written ID3v2.3 tag prepended
 - Speed change intentionally shifts pitch (no pitch correction) — this is the slowed & reverb sound
