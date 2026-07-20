@@ -67,6 +67,7 @@ export function initPlaylist(data, sourceUrl, { firstTrackPath = null } = {}) {
     retries: 0,
     cachedArrayBuffer: null,
     cachedDecodedBuffer: null,
+    prefetching: false,
   }));
 
   // If the first track was already downloaded by importer, mark it ready
@@ -256,8 +257,11 @@ async function _prefetchTrack(idx) {
     !track.filePath ||
     track.cachedArrayBuffer ||
     track.cachedDecodedBuffer ||
+    track.prefetching ||
     !_isInPreloadWindow(idx, ps.currentIndex)
   ) return;
+
+  track.prefetching = true;
   try {
     const res = await _fetchTrackFile(track.filePath);
     const ab = await res.arrayBuffer();
@@ -287,6 +291,8 @@ async function _prefetchTrack(idx) {
       _downloadNext();
     }
     // Pre-fetch failed — will fetch on demand
+  } finally {
+    track.prefetching = false;
   }
 }
 
@@ -534,17 +540,22 @@ function _maintainPreloadWindow(currentIndex) {
   for (let i = 0; i < ps.tracks.length; i++) {
     const t = ps.tracks[i];
     const inWindow = _isInPreloadWindow(i, currentIndex);
-    if (!inWindow) {
-      t.cachedArrayBuffer = null;
-      t.cachedDecodedBuffer = null;
-
-      if (!settings.keepPlaylistDownloads && t.status === 'ready' && t.filePath) {
-        // Restore the original disk-saving behavior when retention is disabled.
-        fetch(`${SERVER}/api/file?path=${encodeURIComponent(t.filePath)}&consume=1`).catch(() => {});
-        t.filePath = null;
-        t.status = 'evicted';
-        _updateRowStatus(i);
+    if (inWindow) {
+      if (i !== currentIndex && t.status === 'ready' && t.filePath) {
+        void _prefetchTrack(i);
       }
+      continue;
+    }
+
+    t.cachedArrayBuffer = null;
+    t.cachedDecodedBuffer = null;
+
+    if (!settings.keepPlaylistDownloads && t.status === 'ready' && t.filePath) {
+      // Restore the original disk-saving behavior when retention is disabled.
+      fetch(`${SERVER}/api/file?path=${encodeURIComponent(t.filePath)}&consume=1`).catch(() => {});
+      t.filePath = null;
+      t.status = 'evicted';
+      _updateRowStatus(i);
     }
   }
 }
