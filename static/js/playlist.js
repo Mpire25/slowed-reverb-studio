@@ -13,6 +13,7 @@ import { createPlaylistView } from './playlist_view.js';
 
 const BEHIND = 2;
 const MAX_RETRIES = 2;
+const DOWNLOAD_KEEPALIVE_MS = 10 * 60 * 1000;
 
 class PlaylistFileMissingError extends Error {
   constructor() {
@@ -33,6 +34,7 @@ const ps = {
   activeES: null,     // currently open EventSource
   downloadingIndex: -1,
   pendingPlayIndex: -1,  // track index waiting on a download before playing
+  keepAliveTimer: null,
 };
 const view = createPlaylistView({
   onJumpToTrack: index => jumpToTrack(index),
@@ -76,6 +78,8 @@ export function initPlaylist(data, sourceUrl, { firstTrackPath = null } = {}) {
     ps.tracks[0].status = 'ready';
   }
 
+  _startDownloadKeepAlive();
+
   // Register the close hook for resetStudio
   window.__playlistCloseHook = closePlaylist;
 
@@ -99,6 +103,7 @@ export function closePlaylist() {
 
 export function refreshPreloadWindow() {
   if (!ps.active || ps.currentIndex < 0) return;
+  _keepRetainedDownloadsAlive();
   _maintainPreloadWindow(ps.currentIndex);
   _downloadNext();
 }
@@ -480,10 +485,37 @@ function _isAnyTrackPlaying() {
   return state.playing;
 }
 
+// ── Internal: retained download keepalive ─────────────────────────────────────
+
+function _keepRetainedDownloadsAlive() {
+  if (!ps.active || !settings.keepPlaylistDownloads) return;
+
+  const paths = ps.tracks
+    .filter(track => track.status === 'ready' && track.filePath)
+    .map(track => track.filePath);
+  if (paths.length === 0) return;
+
+  fetch(`${SERVER}/api/playlist/keepalive`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paths }),
+  }).catch(() => {});
+}
+
+function _startDownloadKeepAlive() {
+  if (ps.keepAliveTimer) clearInterval(ps.keepAliveTimer);
+  _keepRetainedDownloadsAlive();
+  ps.keepAliveTimer = setInterval(_keepRetainedDownloadsAlive, DOWNLOAD_KEEPALIVE_MS);
+}
+
 // ── Internal: teardown ─────────────────────────────────────────────────────────
 
 function _teardown() {
   setOnTrackEnded(null);
+  if (ps.keepAliveTimer) {
+    clearInterval(ps.keepAliveTimer);
+    ps.keepAliveTimer = null;
+  }
   if (ps.activeES) {
     ps.activeES.close();
     ps.activeES = null;
