@@ -13,6 +13,7 @@ import { createPlaylistView } from './playlist_view.js';
 
 const BEHIND = 2;
 const MAX_RETRIES = 2;
+const DOWNLOAD_KEEPALIVE_MS = 10 * 60 * 1000;
 
 class PlaylistFileMissingError extends Error {
   constructor() {
@@ -33,6 +34,7 @@ const ps = {
   activeES: null,     // currently open EventSource
   downloadingIndex: -1,
   pendingPlayIndex: -1,  // track index waiting on a download before playing
+  keepAliveTimer: null,
 };
 const view = createPlaylistView({
   onJumpToTrack: index => jumpToTrack(index),
@@ -67,6 +69,7 @@ export function initPlaylist(data, sourceUrl, { firstTrackPath = null } = {}) {
     retries: 0,
     cachedArrayBuffer: null,
     cachedDecodedBuffer: null,
+    prefetching: false,
   }));
 
   // If the first track was already downloaded by importer, mark it ready
@@ -74,6 +77,8 @@ export function initPlaylist(data, sourceUrl, { firstTrackPath = null } = {}) {
     ps.tracks[0].filePath = firstTrackPath;
     ps.tracks[0].status = 'ready';
   }
+
+  _startDownloadKeepAlive();
 
   // Register the close hook for resetStudio
   window.__playlistCloseHook = closePlaylist;
@@ -98,7 +103,8 @@ export function closePlaylist() {
 
 export function refreshPreloadWindow() {
   if (!ps.active || ps.currentIndex < 0) return;
-  _evictOutsideWindow(ps.currentIndex);
+  _keepRetainedDownloadsAlive();
+  _maintainPreloadWindow(ps.currentIndex);
   _downloadNext();
 }
 
@@ -147,7 +153,7 @@ function _setCurrentTrack(index) {
   const prev = ps.currentIndex;
   ps.currentIndex = index;
 
-  _evictOutsideWindow(index);
+  _maintainPreloadWindow(index);
 
   view.setCurrentRow(prev, index);
 
@@ -251,15 +257,34 @@ async function _loadAndPlayTrack(index) {
 
 async function _prefetchTrack(idx) {
   const track = ps.tracks[idx];
-  if (!track || !track.filePath || track.cachedArrayBuffer || track.cachedDecodedBuffer) return;
+  if (
+    !track ||
+    !track.filePath ||
+    track.cachedArrayBuffer ||
+    track.cachedDecodedBuffer ||
+    track.prefetching ||
+    !_isInPreloadWindow(idx, ps.currentIndex)
+  ) return;
+
+  track.prefetching = true;
   try {
     const res = await _fetchTrackFile(track.filePath);
     const ab = await res.arrayBuffer();
-    if (!ps.active || !ps.tracks[idx] || ps.tracks[idx].status !== 'ready') return; // evicted while fetching
+    if (
+      !ps.active ||
+      !ps.tracks[idx] ||
+      ps.tracks[idx].status !== 'ready' ||
+      !_isInPreloadWindow(idx, ps.currentIndex)
+    ) return;
     track.cachedArrayBuffer = ab;
     try {
       const decoded = await getCtx().decodeAudioData(ab.slice(0));
-      if (ps.active && ps.tracks[idx] && ps.tracks[idx].status === 'ready') {
+      if (
+        ps.active &&
+        ps.tracks[idx] &&
+        ps.tracks[idx].status === 'ready' &&
+        _isInPreloadWindow(idx, ps.currentIndex)
+      ) {
         track.cachedDecodedBuffer = decoded;
       }
     } catch (e) {
@@ -271,6 +296,8 @@ async function _prefetchTrack(idx) {
       _downloadNext();
     }
     // Pre-fetch failed — will fetch on demand
+  } finally {
+    track.prefetching = false;
   }
 }
 
@@ -379,6 +406,14 @@ function _startTrackDownload(idx) {
     track.filePath = d.file;
     track.status = 'ready';
     _updateRowStatus(idx);
+    _maintainPreloadWindow(ps.currentIndex);
+
+    // The setting may have evicted a download that finished after the user
+    // moved outside its preload window.
+    if (track.status !== 'ready') {
+      _downloadNext();
+      return;
+    }
 
     // If this was the track we were waiting on, play it now
     if (ps.pendingPlayIndex === idx || (idx === ps.currentIndex && !_isAnyTrackPlaying())) {
@@ -450,10 +485,37 @@ function _isAnyTrackPlaying() {
   return state.playing;
 }
 
+// ── Internal: retained download keepalive ─────────────────────────────────────
+
+function _keepRetainedDownloadsAlive() {
+  if (!ps.active || !settings.keepPlaylistDownloads) return;
+
+  const paths = ps.tracks
+    .filter(track => track.status === 'ready' && track.filePath)
+    .map(track => track.filePath);
+  if (paths.length === 0) return;
+
+  fetch(`${SERVER}/api/playlist/keepalive`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paths }),
+  }).catch(() => {});
+}
+
+function _startDownloadKeepAlive() {
+  if (ps.keepAliveTimer) clearInterval(ps.keepAliveTimer);
+  _keepRetainedDownloadsAlive();
+  ps.keepAliveTimer = setInterval(_keepRetainedDownloadsAlive, DOWNLOAD_KEEPALIVE_MS);
+}
+
 // ── Internal: teardown ─────────────────────────────────────────────────────────
 
 function _teardown() {
   setOnTrackEnded(null);
+  if (ps.keepAliveTimer) {
+    clearInterval(ps.keepAliveTimer);
+    ps.keepAliveTimer = null;
+  }
   if (ps.activeES) {
     ps.activeES.close();
     ps.activeES = null;
@@ -506,23 +568,31 @@ function _getAheadCount() {
   return Math.min(MAX_PLAYLIST_PRELOAD, Math.max(MIN_PLAYLIST_PRELOAD, rounded));
 }
 
-function _evictOutsideWindow(currentIndex) {
+function _maintainPreloadWindow(currentIndex) {
   for (let i = 0; i < ps.tracks.length; i++) {
     const t = ps.tracks[i];
-    const inWindow = _isInRetentionWindow(i, currentIndex);
-    if (!inWindow && t.status === 'ready' && t.filePath) {
-      // Fire-and-forget file cleanup
+    const inWindow = _isInPreloadWindow(i, currentIndex);
+    if (inWindow) {
+      if (i !== currentIndex && t.status === 'ready' && t.filePath) {
+        void _prefetchTrack(i);
+      }
+      continue;
+    }
+
+    t.cachedArrayBuffer = null;
+    t.cachedDecodedBuffer = null;
+
+    if (!settings.keepPlaylistDownloads && t.status === 'ready' && t.filePath) {
+      // Restore the original disk-saving behavior when retention is disabled.
       fetch(`${SERVER}/api/file?path=${encodeURIComponent(t.filePath)}&consume=1`).catch(() => {});
       t.filePath = null;
       t.status = 'evicted';
-      t.cachedArrayBuffer = null;
-      t.cachedDecodedBuffer = null;
       _updateRowStatus(i);
     }
   }
 }
 
-function _isInRetentionWindow(trackIndex, currentIndex) {
+function _isInPreloadWindow(trackIndex, currentIndex) {
   const total = ps.tracks.length;
   if (total === 0) return false;
   const aheadCount = _getAheadCount();

@@ -387,6 +387,37 @@ def playlist_info():
         return jsonify({"error": msg}), 500
 
 
+@app.route("/api/playlist/keepalive", methods=["POST"])
+def playlist_keepalive():
+    """Keep downloaded files from expiring while their playlist is active."""
+    payload = request.get_json(silent=True)
+    paths = payload.get("paths") if isinstance(payload, dict) else None
+    if not isinstance(paths, list):
+        return jsonify({"error": "Expected a paths list"}), 400
+    if len(paths) > 2000:
+        return jsonify({"error": "Too many paths"}), 400
+
+    downloads_root = DOWNLOADS_DIR.resolve()
+    touched = 0
+    for raw_path in paths:
+        if not isinstance(raw_path, str):
+            continue
+        try:
+            path = Path(raw_path).resolve()
+            path.relative_to(downloads_root)
+        except (OSError, RuntimeError, ValueError):
+            continue
+        if path.suffix.lower() != ".mp3" or not path.is_file():
+            continue
+        try:
+            os.utime(path, None)
+            touched += 1
+        except OSError:
+            pass
+
+    return jsonify({"ok": True, "touched": touched})
+
+
 @app.route("/api/download/track")
 def download_track():
     """

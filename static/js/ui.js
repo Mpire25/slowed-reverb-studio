@@ -321,6 +321,11 @@ $id('playlistPreloadCount').addEventListener('change', e => {
   saveSettings();
   refreshPreloadWindow();
 });
+$id('keepPlaylistDownloadsToggle').addEventListener('change', e => {
+  settings.keepPlaylistDownloads = e.target.checked;
+  saveSettings();
+  refreshPreloadWindow();
+});
 $id('bottomVisualizerToggle').addEventListener('change', e => {
   settings.visualizerEnabled = e.target.checked;
   state.visualizerEnabled = settings.visualizerEnabled;

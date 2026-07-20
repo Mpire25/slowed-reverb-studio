@@ -65,7 +65,7 @@ The gear icon (top right) opens settings to change default slider values.
 
 When the backend is running, a URL import field appears below the drop zone. Paste any YouTube video URL or Spotify track/album/playlist URL — the studio streams live download progress directly in the UI.
 
-Importing a Spotify album/playlist or a YouTube Music album/playlist opens a **playlist panel** alongside the studio. Tracks download progressively in the background; the studio auto-advances to the next track when one finishes. Use the **Prev/Next** transport buttons to skip, and toggle **Loop** to wrap back to the start. The number of tracks preloaded ahead can be adjusted in Settings.
+Importing a Spotify album/playlist or a YouTube Music album/playlist opens a **playlist panel** alongside the studio. Tracks download progressively in the background; by default, downloaded tracks remain available for the rest of the playlist session. The studio auto-advances to the next track when one finishes. Use the **Prev/Next** transport buttons to skip, and toggle **Loop** to wrap back to the start. The number of tracks preloaded ahead and whether downloaded tracks are retained can be adjusted in Settings.
 
 The playlist panel header shows source links when available (Spotify, YouTube, or both).
 
