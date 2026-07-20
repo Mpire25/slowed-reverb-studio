@@ -38,6 +38,7 @@ export function loadSettings() {
     if (Number.isFinite(parsed.defaultReverb)) settings.defaultReverb = parsed.defaultReverb;
     if (Number.isFinite(parsed.defaultDecay)) settings.defaultDecay = parsed.defaultDecay;
     if (parsed.playlistPreload !== undefined) settings.playlistPreload = clampPlaylistPreload(parsed.playlistPreload);
+    if (typeof parsed.keepPlaylistDownloads === 'boolean') settings.keepPlaylistDownloads = parsed.keepPlaylistDownloads;
     if (typeof parsed.loopEnabled === 'boolean') settings.loopEnabled = parsed.loopEnabled;
     if (typeof parsed.visualizerEnabled === 'boolean') settings.visualizerEnabled = parsed.visualizerEnabled;
     if (typeof parsed.artThemeEnabled === 'boolean') settings.artThemeEnabled = parsed.artThemeEnabled;
@@ -60,6 +61,7 @@ export function syncSettingsUI() {
   $id('defaultDecay').value = settings.defaultDecay;
   settings.playlistPreload = clampPlaylistPreload(settings.playlistPreload);
   $id('playlistPreloadCount').value = settings.playlistPreload;
+  $id('keepPlaylistDownloadsToggle').checked = settings.keepPlaylistDownloads;
   $id('bottomVisualizerToggle').checked = settings.visualizerEnabled;
   $id('artThemeToggle').checked = settings.artThemeEnabled;
 

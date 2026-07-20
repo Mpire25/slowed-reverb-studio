@@ -98,7 +98,7 @@ export function closePlaylist() {
 
 export function refreshPreloadWindow() {
   if (!ps.active || ps.currentIndex < 0) return;
-  _evictOutsideWindow(ps.currentIndex);
+  _maintainPreloadWindow(ps.currentIndex);
   _downloadNext();
 }
 
@@ -147,7 +147,7 @@ function _setCurrentTrack(index) {
   const prev = ps.currentIndex;
   ps.currentIndex = index;
 
-  _evictOutsideWindow(index);
+  _maintainPreloadWindow(index);
 
   view.setCurrentRow(prev, index);
 
@@ -251,15 +251,31 @@ async function _loadAndPlayTrack(index) {
 
 async function _prefetchTrack(idx) {
   const track = ps.tracks[idx];
-  if (!track || !track.filePath || track.cachedArrayBuffer || track.cachedDecodedBuffer) return;
+  if (
+    !track ||
+    !track.filePath ||
+    track.cachedArrayBuffer ||
+    track.cachedDecodedBuffer ||
+    !_isInPreloadWindow(idx, ps.currentIndex)
+  ) return;
   try {
     const res = await _fetchTrackFile(track.filePath);
     const ab = await res.arrayBuffer();
-    if (!ps.active || !ps.tracks[idx] || ps.tracks[idx].status !== 'ready') return; // evicted while fetching
+    if (
+      !ps.active ||
+      !ps.tracks[idx] ||
+      ps.tracks[idx].status !== 'ready' ||
+      !_isInPreloadWindow(idx, ps.currentIndex)
+    ) return;
     track.cachedArrayBuffer = ab;
     try {
       const decoded = await getCtx().decodeAudioData(ab.slice(0));
-      if (ps.active && ps.tracks[idx] && ps.tracks[idx].status === 'ready') {
+      if (
+        ps.active &&
+        ps.tracks[idx] &&
+        ps.tracks[idx].status === 'ready' &&
+        _isInPreloadWindow(idx, ps.currentIndex)
+      ) {
         track.cachedDecodedBuffer = decoded;
       }
     } catch (e) {
@@ -379,6 +395,14 @@ function _startTrackDownload(idx) {
     track.filePath = d.file;
     track.status = 'ready';
     _updateRowStatus(idx);
+    _maintainPreloadWindow(ps.currentIndex);
+
+    // The setting may have evicted a download that finished after the user
+    // moved outside its preload window.
+    if (track.status !== 'ready') {
+      _downloadNext();
+      return;
+    }
 
     // If this was the track we were waiting on, play it now
     if (ps.pendingPlayIndex === idx || (idx === ps.currentIndex && !_isAnyTrackPlaying())) {
@@ -506,23 +530,26 @@ function _getAheadCount() {
   return Math.min(MAX_PLAYLIST_PRELOAD, Math.max(MIN_PLAYLIST_PRELOAD, rounded));
 }
 
-function _evictOutsideWindow(currentIndex) {
+function _maintainPreloadWindow(currentIndex) {
   for (let i = 0; i < ps.tracks.length; i++) {
     const t = ps.tracks[i];
-    const inWindow = _isInRetentionWindow(i, currentIndex);
-    if (!inWindow && t.status === 'ready' && t.filePath) {
-      // Fire-and-forget file cleanup
-      fetch(`${SERVER}/api/file?path=${encodeURIComponent(t.filePath)}&consume=1`).catch(() => {});
-      t.filePath = null;
-      t.status = 'evicted';
+    const inWindow = _isInPreloadWindow(i, currentIndex);
+    if (!inWindow) {
       t.cachedArrayBuffer = null;
       t.cachedDecodedBuffer = null;
-      _updateRowStatus(i);
+
+      if (!settings.keepPlaylistDownloads && t.status === 'ready' && t.filePath) {
+        // Restore the original disk-saving behavior when retention is disabled.
+        fetch(`${SERVER}/api/file?path=${encodeURIComponent(t.filePath)}&consume=1`).catch(() => {});
+        t.filePath = null;
+        t.status = 'evicted';
+        _updateRowStatus(i);
+      }
     }
   }
 }
 
-function _isInRetentionWindow(trackIndex, currentIndex) {
+function _isInPreloadWindow(trackIndex, currentIndex) {
   const total = ps.tracks.length;
   if (total === 0) return false;
   const aheadCount = _getAheadCount();

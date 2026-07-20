@@ -55,6 +55,7 @@ export const settings = {
   defaultReverb: 30,
   defaultDecay: 2,
   playlistPreload: 5,
+  keepPlaylistDownloads: true,
   loopEnabled: false,
   visualizerEnabled: true,
   artThemeEnabled: true,
