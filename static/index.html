@@ -324,9 +324,6 @@
       <button class="modal-cancel" id="modalCancel">Cancel</button>
       <button class="modal-confirm" id="modalConfirm">Export</button>
     </div>
-    <div class="progress-wrap" id="progressWrap" style="display:none">
-      <div class="progress-bar" id="progressBar"></div>
-    </div>
   </div>
 </div>
 
@@ -373,8 +370,47 @@
 <!-- Visualizer fullscreen transition overlay -->
 <div id="vizFsTransitionOverlay"></div>
 
-<!-- Toast -->
-<div class="toast" id="toast"></div>
+<!-- Toasts -->
+<div class="toast-stack">
+  <div
+    class="export-toast"
+    id="exportToast"
+    role="status"
+    aria-live="polite"
+    aria-atomic="true"
+  >
+    <div class="export-toast-icon" id="exportToastIcon" aria-hidden="true">
+      <svg class="export-toast-download-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>
+      </svg>
+      <svg class="export-toast-success-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m5 12 4 4L19 6"/>
+      </svg>
+    </div>
+    <div class="export-toast-content">
+      <div class="export-toast-heading">
+        <div class="export-toast-copy">
+          <div class="export-toast-title" id="exportToastTitle">Preparing download…</div>
+          <div class="export-toast-filename" id="exportToastFilename"></div>
+        </div>
+        <span class="export-toast-percent" id="exportToastPercent">0%</span>
+        <button class="export-toast-cancel" id="exportCancelBtn" type="button">Cancel</button>
+      </div>
+      <div
+        class="export-toast-progress"
+        id="exportToastProgress"
+        role="progressbar"
+        aria-label="Download progress"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+      >
+        <div class="export-toast-progress-fill" id="exportToastProgressFill"></div>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</div>
 <canvas id="bottomVisualizer" class="bottom-visualizer" aria-hidden="true"></canvas>
 
 <!-- Visualizer Fullscreen Bar -->

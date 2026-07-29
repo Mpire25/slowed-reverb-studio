@@ -25,7 +25,7 @@ import {
 } from './visualizer.js';
 import { handleFileObject, resetStudio, updateSourceImportUI } from './loader.js';
 import { initImporter } from './importer.js';
-import { doExport, closeModal } from './exporter.js';
+import { cancelExport, closeModal, doExport, isExporting } from './exporter.js';
 import { loadSettings, saveSettings, syncSettingsUI } from './settings.js';
 import { initSpotifyAuth } from './spotify_auth.js';
 import { applyThemeFromCurrentTrack } from './theme.js';
@@ -250,13 +250,12 @@ $id('newSongBtn').addEventListener('click', resetStudio);
 // ─── Export Modal ────────────────────────────────────────────────────────────
 $id('downloadBtn').addEventListener('click', () => {
   if (!state.audioBuffer) return;
+  if (isExporting()) return;
   const title = state.title;
   const suffix = getExportSuffix();
   const artist = state.artist;
   const suggested = sanitize(`${artist} - ${title}${suffix}`) + '.mp3';
   $id('filenameInput').value = suggested;
-  $id('progressWrap').style.display = 'none';
-  $id('progressBar').style.width = '0%';
   $id('modalConfirm').disabled = false;
   setText($id('modalConfirm'), 'Export');
   toggleClass($id('modalOverlay'), 'open', true);
@@ -272,6 +271,7 @@ $id('modalConfirm').addEventListener('click', async () => {
   const filename = $id('filenameInput').value.trim() || 'track.mp3';
   await doExport(filename);
 });
+$id('exportCancelBtn').addEventListener('click', cancelExport);
 
 // ─── Settings Panel ──────────────────────────────────────────────────────────
 $id('gearBtn').addEventListener('click', () => {
