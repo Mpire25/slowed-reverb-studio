@@ -51,7 +51,7 @@ Then open **`http://localhost:7337`** in your browser.
    - **Reverb Mix** — dry/wet blend (default 30%)
    - **Reverb Decay** — tail length in seconds (default 2s)
 3. Hit play to preview
-4. Click **Download MP3** → confirm the filename → exports with correct ID3 tags (title, artist, album art). The suggested name auto-adds `Slowed`/`Sped Up` and `Reverb` only when those effects are active.
+4. Click **Download MP3** → confirm the filename → the export continues in a cancellable progress toast while you keep using the studio. The export uses the track, effects, title, artist, and album art that were active when it started, so later edits do not change it. The suggested name auto-adds `Slowed`/`Sped Up` and `Reverb` only when those effects are active.
 
 Keyboard shortcuts: `Space` to play/pause, `M` to toggle mute, `Shift+N` to reset/load a new track. Click the waveform to seek.
 
@@ -98,6 +98,7 @@ slowed-reverb-studio/
       importer_view.js       — import form and progress view updates
       spotify_auth.js   — Spotify OAuth connect/disconnect status UI
       exporter.js       — MP3 export
+      mp3_encoder_worker.js — cancellable background MP3 encoding
       settings.js       — settings persistence
       controls.js       — shared slider/loop UI sync helpers
       playlist.js       — playlist state, progressive download + auto-advance
